@@ -1,15 +1,20 @@
-const { GraphQLClient } = require('graphql-request');
-
 // Configuration TheGraph V3
 const THEGRAPH_URL_V3 = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
 const API_KEY = process.env.THEGRAPH_API_KEY;
 
-// Client GraphQL
-const client = new GraphQLClient(THEGRAPH_URL_V3, {
-  headers: API_KEY ? {
-    'Authorization': `Bearer ${API_KEY}`
-  } : {}
-});
+// Client GraphQL (utilise un import dynamique pour ES modules)
+let client = null;
+async function getClient() {
+  if (!client) {
+    const { GraphQLClient } = await import('graphql-request');
+    client = new GraphQLClient(THEGRAPH_URL_V3, {
+      headers: API_KEY ? {
+        'Authorization': `Bearer ${API_KEY}`
+      } : {}
+    });
+  }
+  return client;
+}
 
 // Requête pour récupérer toutes les transactions avec pagination (V3 uniquement)
 const TRANSACTIONS_QUERY_V3 = `
@@ -107,7 +112,8 @@ async function fetchAllTransactionsV3(userAddress) {
         skip: skip
       };
 
-      const data = await client.request(TRANSACTIONS_QUERY_V3, variables);
+      const graphqlClient = await getClient();
+      const data = await graphqlClient.request(TRANSACTIONS_QUERY_V3, variables);
 
       const validSymbols = ['USDC', 'WXDAI'];
 
@@ -136,7 +142,7 @@ async function fetchAllTransactionsV3(userAddress) {
         hasMore = false;
       } else {
         skip += LIMIT;
-        console.log(`⏭️  Pagination suivante: skip=${skip}`);
+        console.log(`⏭️  Pagination suivante1: skip=${skip}`);
       }
     }
 

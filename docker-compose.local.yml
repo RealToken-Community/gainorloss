@@ -1,0 +1,46 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_ENV: production
+
+    ports:
+      - '3000:3000'
+
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:3001
+      - NEXT_PUBLIC_GNOSISSCAN_API_KEY=${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+      - NEXT_PUBLIC_THEGRAPH_API_URL=${NEXT_PUBLIC_THEGRAPH_API_URL}
+
+    depends_on:
+      - backend
+
+    networks:
+      - rmmgain-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+
+    ports:
+      - '3001:3001'
+
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - THEGRAPH_API_KEY=${THEGRAPH_API_KEY}
+      - GNOSISSCAN_API_KEY=${GNOSISSCAN_API_KEY}
+      - GNOSIS_RPC_URL=${GNOSIS_RPC_URL:-https://rpc.gnosischain.com/}
+      - CORS_ORIGIN=http://localhost:3000
+
+    networks:
+      - rmmgain-network
+
+networks:
+  rmmgain-network:
+    driver: bridge
+

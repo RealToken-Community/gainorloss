@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Transaction } from '../utils/api/types';
+import { TOKEN_TO_VERSION } from '../utils/constants';
 
 interface TransactionWithType extends Transaction {
-  type: 'borrow' | 'repay' | 'deposit' | 'withdraw';
+  type: 'borrow' | 'repay' | 'deposit' | 'withdraw' | 'ronday' | 'in_others' | 'out_others';
   token: 'USDC' | 'WXDAI';
   version?: 'V2' | 'V3';
 }
@@ -13,15 +14,9 @@ interface TransactionsTableProps {
   title: string;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-}
-
-type FilterType = 'all' | 'USDC' | 'WXDAI';
-type TransactionType = 'all' | 'borrow' | 'repay' | 'deposit' | 'withdraw';
-type VersionType = 'all' | 'V2' | 'V3';
-
-interface DateRange {
-  start: Date;
-  end: Date;
+  // Filtres partagés depuis le parent
+  selectedTokens: string[];
+  dateRange: { start: string; end: string };
 }
 
 const TransactionsTable: React.FC<TransactionsTableProps> = ({ 
@@ -29,38 +24,83 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
   userAddress, 
   title, 
   isCollapsed = false, 
-  onToggleCollapse 
+  onToggleCollapse,
+  selectedTokens,
+  dateRange: dateRangeProp
 }) => {
-  const [tokenFilter, setTokenFilter] = useState<FilterType>('all');
-  const [typeFilter, setTypeFilter] = useState<TransactionType>('all');
-  const [versionFilter, setVersionFilter] = useState<VersionType>('all');
-  const [dateRange, setDateRange] = useState<DateRange>(() => {
-    if (transactions.length === 0) {
-      const today = new Date();
-      return { start: today, end: today };
-    }
-    
-    const timestamps = transactions.map(tx => tx.timestamp * 1000);
-    const minDate = new Date(Math.min(...timestamps));
-    const maxDate = new Date(Math.max(...timestamps));
-    
-    return { start: minDate, end: maxDate };
-  });
+  // Sélection multiple des types de transactions (local)
+  // Si le Set contient 'all', alors tous les types sont sélectionnés
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(['all']));
 
   // Filtrer les transactions
   const filteredTransactions = useMemo(() => {
+    // Normaliser les dates pour la comparaison (éviter les problèmes de timezone)
+    const startDate = new Date(dateRangeProp.start);
+    startDate.setHours(0, 0, 0, 0);
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
+    
+    const endDate = new Date(dateRangeProp.end);
+    endDate.setHours(23, 59, 59, 999);
+    const endTimestamp = Math.floor(endDate.getTime() / 1000);
+    
     return transactions.filter(tx => {
-      const tokenMatch = tokenFilter === 'all' || tx.token === tokenFilter;
-      const typeMatch = typeFilter === 'all' || tx.type === typeFilter;
-      const versionMatch = versionFilter === 'all' || tx.version === versionFilter;
+      // Filtre par token et version (depuis props du parent)
+      // Utilise TOKEN_TO_VERSION pour déterminer automatiquement la version
+      const tokenMatch = selectedTokens.some(selectedToken => {
+        const expectedVersion = TOKEN_TO_VERSION[selectedToken];
+        if (!expectedVersion) return false;
+        
+        // Pour USDC, on vérifie juste le token
+        if (selectedToken === 'USDC') {
+          return tx.token === 'USDC' && tx.version === expectedVersion;
+        }
+        
+        // Pour WXDAI et WXDAI_V2, on vérifie le token ET la version
+        if (selectedToken === 'WXDAI' || selectedToken === 'WXDAI_V2') {
+          return tx.token === 'WXDAI' && tx.version === expectedVersion;
+        }
+        
+        return false;
+      });
       
-      // Filtre par date
-      const txDate = new Date(tx.timestamp * 1000);
-      const dateMatch = txDate >= dateRange.start && txDate <= dateRange.end;
+      // Filtre par type de transaction (local)
+      const typeMatch = selectedTypes.has('all') || selectedTypes.has(tx.type);
       
-      return tokenMatch && typeMatch && versionMatch && dateMatch;
+      // Filtre par date (depuis props du parent) - Comparer les timestamps directement
+      const txTimestamp = tx.timestamp; // Déjà en Unix timestamp
+      const dateMatch = txTimestamp >= startTimestamp && txTimestamp <= endTimestamp;
+      
+      return tokenMatch && typeMatch && dateMatch;
     });
-  }, [transactions, tokenFilter, typeFilter, versionFilter, dateRange]);
+  }, [transactions, selectedTokens, selectedTypes, dateRangeProp.start, dateRangeProp.end]);
+
+  // Gérer la sélection/désélection d'un type
+  const handleTypeToggle = (type: string) => {
+    setSelectedTypes(prev => {
+      const newSet = new Set(prev);
+      
+      if (type === 'all') {
+        // Si on clique sur 'all', on vide le Set et on ajoute seulement 'all'
+        return new Set(['all']);
+      } else {
+        // Si on sélectionne un type spécifique, on retire 'all' s'il était présent
+        newSet.delete('all');
+        
+        // Toggle le type sélectionné
+        if (newSet.has(type)) {
+          newSet.delete(type);
+          // Si plus rien n'est sélectionné, on remet 'all'
+          if (newSet.size === 0) {
+            return new Set(['all']);
+          }
+        } else {
+          newSet.add(type);
+        }
+        
+        return newSet;
+      }
+    });
+  };
 
   // Fonction pour formater les montants
   const formatAmount = (amount: string, decimals = 6): number => {
@@ -78,23 +118,9 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
     });
   };
 
-  // Fonction pour obtenir les dates min/max des transactions
-  const getDateRange = () => {
-    if (transactions.length === 0) {
-      const today = new Date();
-      return { min: today, max: today };
-    }
-    
-    const timestamps = transactions.map(tx => tx.timestamp * 1000);
-    return {
-      min: new Date(Math.min(...timestamps)),
-      max: new Date(Math.max(...timestamps))
-    };
-  };
-
   // Fonction pour formater une date pour l'input
-  const formatDateForInput = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+  const formatDateForInput = (dateStr: string): string => {
+    return dateStr;
   };
 
   // Fonction pour obtenir l'icône du type de transaction
@@ -118,6 +144,9 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
       case 'repay': return 'text-green-600';
       case 'deposit': return 'text-blue-600';
       case 'withdraw': return 'text-orange-600';
+      case 'ronday': return 'text-purple-600';
+      case 'in_others': return 'text-cyan-600';
+      case 'out_others': return 'text-pink-600';
       default: return 'text-gray-600';
     }
   };
@@ -180,93 +209,51 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
               <span>Repay: {filteredTransactions.filter(tx => tx.type === 'repay').length}</span>
               <span>Deposit: {filteredTransactions.filter(tx => tx.type === 'deposit').length}</span>
               <span>Withdraw: {filteredTransactions.filter(tx => tx.type === 'withdraw').length}</span>
-              <span>Period: {formatDateForInput(dateRange.start)} - {formatDateForInput(dateRange.end)}</span>
+              <span>Period: {formatDateForInput(dateRangeProp.start)} - {formatDateForInput(dateRangeProp.end)}</span>
             </div>
           )}
 
           {!isCollapsed && (
             <>
-
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-2">
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={tokenFilter}
-                    onChange={(e) => setTokenFilter(e.target.value as FilterType)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All tokens</option>
-                    <option value="USDC">USDC</option>
-                    <option value="WXDAI">WXDAI</option>
-                  </select>
-                  
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value as TransactionType)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All types</option>
-                    <option value="borrow">Borrow</option>
-                    <option value="repay">Repay</option>
-                    <option value="deposit">Deposit</option>
-                    <option value="withdraw">Withdraw</option>
-                    <option value="ronday">Ronday</option>
-                    <option value="in_others">In others</option>
-                    <option value="out_others">Out others</option>
-                  </select>
-                  
-                  <select
-                    value={versionFilter}
-                    onChange={(e) => setVersionFilter(e.target.value as VersionType)}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">All versions</option>
-                    <option value="V2">V2</option>
-                    <option value="V3">V3</option>
-                  </select>
-                </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">From:</span>
-                    <input
-                      type="date"
-                      value={formatDateForInput(dateRange.start)}
-                      onChange={(e) => {
-                        const newDate = new Date(e.target.value);
-                        setDateRange(prev => ({ ...prev, start: newDate }));
-                      }}
-                      min={formatDateForInput(getDateRange().min)}
-                      max={formatDateForInput(dateRange.end)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">To:</span>
-                    <input
-                      type="date"
-                      value={formatDateForInput(dateRange.end)}
-                      onChange={(e) => {
-                        const newDate = new Date(e.target.value);
-                        setDateRange(prev => ({ ...prev, end: newDate }));
-                      }}
-                      min={formatDateForInput(dateRange.start)}
-                      max={formatDateForInput(getDateRange().max)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                  {/* Sélection multiple des types de transactions (local) */}
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white min-w-[200px]">
+                    {([
+                      { value: 'all', label: 'All', icon: '📊' },
+                      { value: 'borrow', label: 'Borrow', icon: '🤝' },
+                      { value: 'repay', label: 'Repay', icon: '📥' },
+                      { value: 'deposit', label: 'Deposit', icon: '💰' },
+                      { value: 'withdraw', label: 'Withdraw', icon: '💸' },
+                      { value: 'ronday', label: 'Ronday', icon: '🗓' },
+                      { value: 'in_others', label: 'In others', icon: '⬇️' },
+                      { value: 'out_others', label: 'Out others', icon: '⬆️' },
+                    ] as const).map(({ value, label, icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => handleTypeToggle(value)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          selectedTypes.has(value)
+                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                            : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span>{icon}</span>
+                        <span>{label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
-                      setTokenFilter('all');
-                      setTypeFilter('all');
-                      const range = getDateRange();
-                      setDateRange({ start: range.min, end: range.max });
+                      setSelectedTypes(new Set(['all']));
                     }}
                     className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
                   >
-                    🔄 Reset
+                    🔄 Reset Filters
                   </button>
                 </div>
               </div>
@@ -320,7 +307,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
             <div className="bg-gray-50 border border-gray-100 p-3 sm:p-4 rounded-xl col-span-2 sm:col-span-1">
               <h3 className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Period</h3>
               <p className="text-xs sm:text-sm font-bold text-gray-600">
-                {formatDateForInput(dateRange.start)} - {formatDateForInput(dateRange.end)}
+                {formatDateForInput(dateRangeProp.start)} - {formatDateForInput(dateRangeProp.end)}
               </p>
             </div>
           </div>

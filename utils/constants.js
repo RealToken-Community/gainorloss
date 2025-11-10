@@ -57,12 +57,31 @@ const TransactionType = {
   WITHDRAW: 'withdraw'
 };
 
+// Mapping des tokens sélectionnés vers leurs versions
+// USDC et WXDAI sont V3, WXDAI_V2 est V2
+const TOKEN_TO_VERSION = {
+  USDC: 'V3',
+  WXDAI: 'V3',
+  WXDAI_V2: 'V2'
+};
 
+// Fonction helper pour obtenir les versions autorisées depuis les tokens sélectionnés
+const getVersionsFromTokens = (selectedTokens) => {
+  const versions = new Set();
+  selectedTokens.forEach(token => {
+    if (TOKEN_TO_VERSION[token]) {
+      versions.add(TOKEN_TO_VERSION[token]);
+    }
+  });
+  return Array.from(versions);
+};
 
 module.exports = {
   TOKENS,
   ADDRESS_TO_TOKEN,
   CONTRACTS,
   TokenTicker,
-  TransactionType
+  TransactionType,
+  TOKEN_TO_VERSION,
+  getVersionsFromTokens
 };

@@ -66,6 +66,11 @@ const Chart: React.FC<ChartProps> = ({
   tokenAddress,
   userAddress,
 }) => {
+  // Vérifier si toutes les valeurs sont à 0 (ou très proches de 0)
+  // Cela inclut le cas d'un seul point à 0 ou plusieurs points tous à 0
+  const allValuesZero = data && data.length > 0 && data.every(point => Math.abs(point.value) < 0.0001);
+  
+  // Cas 1: Aucune donnée
   if (!data || data.length === 0) {
     return (
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -89,6 +94,35 @@ const Chart: React.FC<ChartProps> = ({
         <div className="text-center py-12">
           <div className="text-gray-400 text-4xl mb-4">📊</div>
           <p className="text-gray-600 text-sm">Never used</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Cas 2: Données filtrées mais toutes à 0 (ou un seul point à 0)
+  if (allValuesZero) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+            {tokenAddress && userAddress && (
+              <MagnetLink 
+                tokenAddress={tokenAddress} 
+                userAddress={userAddress}
+                className="ml-2"
+              />
+            )}
+          </div>
+          {currentBalance && (
+            <div className="text-sm text-gray-600">
+              Balance actuelle: <span className="font-semibold" style={{ color }}>{currentBalance}</span>
+            </div>
+          )}
+        </div>
+        <div className="text-center py-12">
+          <div className="text-gray-400 text-4xl mb-4">📅</div>
+          <p className="text-gray-600 text-sm">Not used in this period</p>
         </div>
       </div>
     );

@@ -1,15 +1,20 @@
-const { GraphQLClient } = require('graphql-request');
-
 // Configuration TheGraph V2
 const THEGRAPH_URL_V2 = 'https://api.thegraph.com/subgraphs/id/QmXT8Cpkjevu2sPN1fKkwb7Px9Wqj84DALA2TQ8nokhj7e';
 const API_KEY = process.env.THEGRAPH_API_KEY;
 
-// Client GraphQL V2
-const clientV2 = new GraphQLClient(THEGRAPH_URL_V2, {
-  headers: API_KEY ? {
-    'Authorization': `Bearer ${API_KEY}`
-  } : {}
-});
+// Client GraphQL V2 (utilise un import dynamique pour ES modules)
+let clientV2 = null;
+async function getClientV2() {
+  if (!clientV2) {
+    const { GraphQLClient } = await import('graphql-request');
+    clientV2 = new GraphQLClient(THEGRAPH_URL_V2, {
+      headers: API_KEY ? {
+        'Authorization': `Bearer ${API_KEY}`
+      } : {}
+    });
+  }
+  return clientV2;
+}
 
 // Requête pour les balances historiques V2 (sans filtrage imbriqué)
 const sTokenBalance_V2_QUERY = `query ATokenMovementsV2($user: String!, $first: Int!, $skip: Int!) {
@@ -66,7 +71,8 @@ async function fetchAllATokenBalancesV2(userAddress, req = null) {
         skip: skip 
       };
       
-      const data = await clientV2.request(sTokenBalance_V2_QUERY, variables);
+      const client = await getClientV2();
+      const data = await client.request(sTokenBalance_V2_QUERY, variables);
       const balances = data.atokenBalanceHistoryItems || [];
       
      
@@ -114,7 +120,8 @@ async function fetchAllVTokenBalancesV2(userAddress, req = null) {
         skip: skip 
       };
       
-      const data = await clientV2.request(dTokenBalance_V2_QUERY, variables);
+      const client = await getClientV2();
+      const data = await client.request(dTokenBalance_V2_QUERY, variables);
       const balances = data.vtokenBalanceHistoryItems || [];
       
       

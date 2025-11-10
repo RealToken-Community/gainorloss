@@ -1,0 +1,42 @@
+services:
+  frontend:
+    image: ${DOCKER_REGISTRY}/rmmgain:${DOCKER_BRANCH}
+    container_name: ${DOCKER_BRANCH}-rmmgain
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:5000
+      - NEXT_PUBLIC_GNOSISSCAN_API_KEY=${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+      - NEXT_PUBLIC_THEGRAPH_API_URL=${NEXT_PUBLIC_THEGRAPH_API_URL}
+    networks:
+      - traefik-realt
+      - rmmgain-network
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.rule=Host(`${HOSTNAME}`)'
+      - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.entrypoints=websecure'
+      - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.rmmgain-${DOCKER_BRANCH}.loadbalancer.server.port=3000'
+    depends_on:
+      - backend
+    restart: always
+
+  backend:
+    image: ${DOCKER_REGISTRY}/rmmgain-backend:${DOCKER_BRANCH}
+    container_name: ${DOCKER_BRANCH}-rmmgain-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - THEGRAPH_API_KEY=${THEGRAPH_API_KEY}
+      - GNOSISSCAN_API_KEY=${GNOSISSCAN_API_KEY}
+      - GNOSIS_RPC_URL=${GNOSIS_RPC_URL:-https://rpc.gnosischain.com/}
+      - CORS_ORIGIN=https://${HOSTNAME}
+    networks:
+      - rmmgain-network
+    restart: always
+
+networks:
+  traefik-realt:
+    external: true
+  rmmgain-network:
+    driver: bridge
+

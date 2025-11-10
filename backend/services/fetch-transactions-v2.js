@@ -1,15 +1,20 @@
-const { GraphQLClient } = require('graphql-request');
-
 // Configuration TheGraph V2
 const THEGRAPH_URL_V2 = 'https://api.thegraph.com/subgraphs/id/QmXT8Cpkjevu2sPN1fKkwb7Px9Wqj84DALA2TQ8nokhj7e';
 const API_KEY = process.env.THEGRAPH_API_KEY;
 
-// Client GraphQL
-const client = new GraphQLClient(THEGRAPH_URL_V2, {
-  headers: API_KEY ? {
-    'Authorization': `Bearer ${API_KEY}`
-  } : {}
-});
+// Client GraphQL (utilise un import dynamique pour ES modules)
+let client = null;
+async function getClient() {
+  if (!client) {
+    const { GraphQLClient } = await import('graphql-request');
+    client = new GraphQLClient(THEGRAPH_URL_V2, {
+      headers: API_KEY ? {
+        'Authorization': `Bearer ${API_KEY}`
+      } : {}
+    });
+  }
+  return client;
+}
 
 // Requête pour récupérer toutes les transactions V2 avec pagination
 const TRANSACTIONS_QUERY_V2 = `
@@ -123,7 +128,8 @@ async function fetchAllTransactionsV2(userAddress) {
         skip: skip
       };
       
-      const data = await client.request(TRANSACTIONS_QUERY_V2, variables);
+      const graphqlClient = await getClient();
+      const data = await graphqlClient.request(TRANSACTIONS_QUERY_V2, variables);
 
       const isValidSymbol = (symbol) => symbol === 'rmmWXDAI';
       

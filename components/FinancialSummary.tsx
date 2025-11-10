@@ -28,6 +28,10 @@ interface FinancialSummaryProps {
   userAddress: string;
   
   transactions: any[];
+  
+  // Filtres partagés depuis le parent
+  selectedTokens: string[];
+  dateRange: { start: string; end: string };
 }
 
 const FinancialSummary: React.FC<FinancialSummaryProps> = ({
@@ -35,65 +39,11 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
   wxdaiData,
   v2Data,
   userAddress,
-  transactions
+  transactions,
+  selectedTokens,
+  dateRange
 }) => {
-  // Calculer la période dynamiquement avec useMemo
-  const defaultPeriod = useMemo(() => {
-    const allDates: string[] = [];
-    
-    // Collecter toutes les dates des données V3
-    if (usdcData?.borrow?.dailyDetails) {
-      usdcData.borrow.dailyDetails.forEach(detail => allDates.push(detail.date));
-    }
-    if (usdcData?.supply?.dailyDetails) {
-      usdcData.supply.dailyDetails.forEach(detail => allDates.push(detail.date));
-    }
-    if (wxdaiData?.borrow?.dailyDetails) {
-      wxdaiData.borrow.dailyDetails.forEach(detail => allDates.push(detail.date));
-    }
-    if (wxdaiData?.supply?.dailyDetails) {
-      wxdaiData.supply.dailyDetails.forEach(detail => allDates.push(detail.date));
-    }
-    
-    // Collecter toutes les dates des données V2
-    if (v2Data?.borrow?.dailyDetails) {
-      v2Data.borrow.dailyDetails.forEach(detail => allDates.push(detail.date));
-    }
-    if (v2Data?.supply?.dailyDetails) {
-      v2Data.supply.dailyDetails.forEach(detail => allDates.push(detail.date));
-    }
-    
-    // Collecter toutes les dates des transactions
-    if (transactions) {
-      transactions.forEach(tx => {
-        const date = new Date(tx.timestamp * 1000);
-        const dateString = date.toISOString().split('T')[0];
-        allDates.push(dateString);
-      });
-    }
-    
-    // Trouver la date la plus ancienne
-    if (allDates.length > 0) {
-      const oldestDate = allDates.sort()[0]; // Tri alphabétique YYYYMMDD
-      console.log(`📅 Date de départ calculée: ${oldestDate} (plus ancien événement)`);
-      return {
-        start: oldestDate,
-        end: new Date().toISOString().split('T')[0] // Aujourd'hui
-      };
-    }
-    
-    // Fallback : 1er janvier de l'année en cours
-    return {
-      start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
-    };
-  }, [usdcData, wxdaiData, v2Data, transactions]);
-
-  // Utiliser la période calculée dynamiquement
-  const [selectedPeriod, setSelectedPeriod] = useState<{ start: string; end: string }>(defaultPeriod);
-
-  // État pour les filtres
-  const [selectedTokens, setSelectedTokens] = useState<string[]>(['USDC', 'WXDAI', 'WXDAI_V2']);
+  // Utiliser directement dateRange (pas besoin de créer une référence)
 
   const calculateInterestForCustomPeriod = (
     dailyDetails: any[], 
@@ -116,14 +66,24 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
 
 
   const financialData = useMemo(() => {
-    const data: any = {};
+    const data: Record<string, {
+      debt: number;
+      supply: number;
+      net: number;
+      version: string;
+      contract: string;
+    }> = {};
     
-
-    const isCustomPeriod = selectedPeriod.start !== defaultPeriod.start || selectedPeriod.end !== defaultPeriod.end;
+    // Calculer les timestamps pour la période sélectionnée (normaliser les dates)
+    // Start : début de la journée (00:00:00)
+    const startDate = new Date(dateRange.start);
+    startDate.setHours(0, 0, 0, 0);
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
     
-    if (isCustomPeriod) {
-      const startTimestamp = new Date(selectedPeriod.start).getTime() / 1000;
-      const endTimestamp = new Date(selectedPeriod.end).getTime() / 1000;
+    // End : fin de la journée (23:59:59)
+    const endDate = new Date(dateRange.end);
+    endDate.setHours(23, 59, 59, 999);
+    const endTimestamp = Math.floor(endDate.getTime() / 1000);
       
       // USDC V3 interpolation
       if (usdcData && selectedTokens.includes('USDC')) {
@@ -193,65 +153,9 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
           contract: TOKENS.WXDAI.debtV2Address
         };
       }
-      
-    } else {
-      // USDC V3
-      if (usdcData && selectedTokens.includes('USDC')) {
-        const lastDebtPoint = usdcData.borrow?.dailyDetails?.[usdcData.borrow.dailyDetails.length - 1];
-        const lastSupplyPoint = usdcData.supply?.dailyDetails?.[usdcData.supply.dailyDetails.length - 1];
-        
-        const debtInterest = lastDebtPoint ? parseFloat(lastDebtPoint.totalInterest) / Math.pow(10, 6) : 0;
-        const supplyInterest = lastSupplyPoint ? parseFloat(lastSupplyPoint.totalInterest) / Math.pow(10, 6) : 0;
-        const netInterest = supplyInterest - debtInterest;
-        
-        data.USDC = {
-          debt: debtInterest,
-          supply: supplyInterest,
-          net: netInterest,
-          version: 'V3',
-          contract: TOKENS.USDC.debtAddress
-        };
-      }
-      
-      // WXDAI V3
-      if (wxdaiData && selectedTokens.includes('WXDAI')) {
-        const lastDebtPoint = wxdaiData.borrow?.dailyDetails?.[wxdaiData.borrow.dailyDetails.length - 1];
-        const lastSupplyPoint = wxdaiData.supply?.dailyDetails?.[wxdaiData.supply.dailyDetails.length - 1];
-        
-        const debtInterest = lastDebtPoint ? parseFloat(lastDebtPoint.totalInterest) / Math.pow(10, 18) : 0;
-        const supplyInterest = lastSupplyPoint ? parseFloat(lastSupplyPoint.totalInterest) / Math.pow(10, 18) : 0;
-        const netInterest = supplyInterest - debtInterest;
-        
-        data.WXDAI = {
-          debt: debtInterest,
-          supply: supplyInterest,
-          net: netInterest,
-          version: 'V3',
-          contract: TOKENS.WXDAI.debtAddress
-        };
-      }
-      
-      // WXDAI V2
-      if (v2Data && selectedTokens.includes('WXDAI_V2')) {
-        const lastDebtPoint = v2Data.borrow?.dailyDetails?.[v2Data.borrow.dailyDetails.length - 1];
-        const lastSupplyPoint = v2Data.supply?.dailyDetails?.[v2Data.supply.dailyDetails.length - 1];
-        
-        const debtInterest = lastDebtPoint ? parseFloat(lastDebtPoint.totalInterest) / Math.pow(10, 18) : 0;
-        const supplyInterest = lastSupplyPoint ? parseFloat(lastSupplyPoint.totalInterest) / Math.pow(10, 18) : 0;
-        const netInterest = supplyInterest - debtInterest;
-        
-        data.WXDAI_V2 = {
-          debt: debtInterest,
-          supply: supplyInterest,
-          net: netInterest,
-          version: 'V2',
-          contract: TOKENS.WXDAI.debtV2Address
-        };
-      }
-    }
     
     return data;
-  }, [usdcData, wxdaiData, v2Data, selectedTokens, selectedPeriod, defaultPeriod]);
+  }, [usdcData, wxdaiData, v2Data, selectedTokens, dateRange.start, dateRange.end]);
 
   // Calculs totaux
   const totals = useMemo(() => {
@@ -265,6 +169,15 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
   const filteredTransactions = useMemo(() => {
     if (!transactions || transactions.length === 0) return [];
     
+    // Normaliser les dates pour la comparaison
+    const startDate = new Date(dateRange.start);
+    startDate.setHours(0, 0, 0, 0);
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
+    
+    const endDate = new Date(dateRange.end);
+    endDate.setHours(23, 59, 59, 999);
+    const endTimestamp = Math.floor(endDate.getTime() / 1000);
+    
     return transactions.filter(tx => {
       // Filtre par token
       const tokenMatch = selectedTokens.some(selectedToken => {
@@ -276,13 +189,11 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
       
       if (!tokenMatch) return false;
 
-      const txDate = new Date(tx.timestamp * 1000);
-      const startDate = new Date(selectedPeriod.start);
-      const endDate = new Date(selectedPeriod.end);
-      
-      return txDate >= startDate && txDate <= endDate;
+      // Comparer les timestamps directement (tx.timestamp est déjà en Unix timestamp)
+      const txTimestamp = tx.timestamp;
+      return txTimestamp >= startTimestamp && txTimestamp <= endTimestamp;
     });
-  }, [transactions, selectedTokens, selectedPeriod]);
+  }, [transactions, selectedTokens, dateRange.start, dateRange.end]);
 
   const exportToCSV = () => {
     const financialHeaders = ['Token', 'Version', 'Debt Interest', 'Supply Interest', 'PnL Net'];
@@ -310,7 +221,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
 
       `RMM Analytics - Financial Summary`,
       `Address: ${userAddress}`,
-      `Period: ${new Date(selectedPeriod.start).toLocaleDateString('fr-CH')} to ${new Date(selectedPeriod.end).toLocaleDateString('fr-CH')}`,
+        `Period: ${new Date(dateRange.start).toLocaleDateString('fr-CH')} to ${new Date(dateRange.end).toLocaleDateString('fr-CH')}`,
       `Generated on: ${new Date().toLocaleDateString('fr-CH')}`,
       ``, 
       financialHeaders.join(','),
@@ -329,7 +240,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `rmm_analytics_${userAddress}_${selectedPeriod.start}_${selectedPeriod.end}.csv`);
+      link.setAttribute('download', `rmm_analytics_${userAddress}_${dateRange.start}_${dateRange.end}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -343,8 +254,8 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
         title: 'RMM Analytics - Rapport Financier',
         address: userAddress,
         period: {
-          start: selectedPeriod.start,
-          end: selectedPeriod.end,
+          start: dateRange.start,
+          end: dateRange.end,
         },
         generatedAt: new Date().toISOString(),
       },
@@ -379,7 +290,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `rmm_analytics_${userAddress}_${selectedPeriod.start}_${selectedPeriod.end}.json`);
+    link.setAttribute('download', `rmm_analytics_${userAddress}_${dateRange.start}_${dateRange.end}.json`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -398,7 +309,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
     doc.setFontSize(12);
     doc.setTextColor(75, 85, 99);
     doc.text(`Address: ${userAddress}`, 20, 45);
-    doc.text(`Period: ${new Date(selectedPeriod.start).toLocaleDateString('fr-CH')} à ${new Date(selectedPeriod.end).toLocaleDateString('fr-CH')}`, 20, 55);
+      doc.text(`Period: ${new Date(dateRange.start).toLocaleDateString('fr-CH')} à ${new Date(dateRange.end).toLocaleDateString('fr-CH')}`, 20, 55);
     doc.text(`Generated on: ${new Date().toLocaleDateString('fr-CH')}`, 20, 65);
     doc.setFontSize(16);
     doc.setTextColor(59, 130, 246);
@@ -507,7 +418,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
 
     });
   
-    const filename = `rmm_analytics_${userAddress}_${selectedPeriod.start}_${selectedPeriod.end}.pdf`;
+      const filename = `rmm_analytics_${userAddress}_${dateRange.start}_${dateRange.end}.pdf`;
     doc.save(filename);
   };
 
@@ -521,55 +432,9 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
       {/*  HEADER: Responsive avec flex-col sur mobile, flex-row sur desktop */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Financial Summary</h2>
-        
-        {/* FILTRES: Responsive avec flex-col sur mobile, flex-row sur desktop */}
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* TOKENS: Responsive avec flex-wrap pour éviter le débordement */}
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">Token:</label>
-            {[
-              { key: 'USDC', label: 'USDC' },
-              { key: 'WXDAI', label: 'WXDAI' },
-              { key: 'WXDAI_V2', label: 'V2' }
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedTokens.includes(key)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedTokens([...selectedTokens, key]);
-                    } else {
-                      setSelectedTokens(selectedTokens.filter(t => t !== key));
-                    }
-                  }}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-600">{label}</span>
-              </label>
-            ))}
-          </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">From</label>
-              <input
-                type="date"
-                value={selectedPeriod.start}
-                onChange={(e) => setSelectedPeriod(prev => ({ ...prev, start: e.target.value }))}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">To</label>
-              <input
-                type="date"
-                value={selectedPeriod.end}
-                onChange={(e) => setSelectedPeriod(prev => ({ ...prev, end: e.target.value }))}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
+        <p className="text-sm text-gray-600">
+          Period analyzed from {new Date(dateRange.start).toLocaleDateString('fr-CH')} to {new Date(dateRange.end).toLocaleDateString('fr-CH')}
+        </p>
       </div>
 
       {/* Tableau récapitulatif */}
@@ -580,7 +445,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
               <th className="text-left py-3 px-4 font-semibold text-gray-900">Token</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-900">Version</th>
               <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                Intérêts Dette
+                Debt Interest
                 <a 
                   href={`https://gnosisscan.io/token/${TOKENS.USDC.debtAddress}?a=${userAddress}`}
                   target="_blank"
@@ -592,7 +457,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
                 </a>
               </th>
               <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                Intérêts Supply
+                Supply Interest
                 <a 
                   href={`https://gnosisscan.io/token/${TOKENS.USDC.supplyAddress}?a=${userAddress}`}
                   target="_blank"
@@ -603,7 +468,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
                   
                 </a>
               </th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-900">Gain Net</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-900">Net Interest</th>
             </tr>
           </thead>
           <tbody>
@@ -655,12 +520,6 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
           </tbody>
         </table>
       </div>
-
-      {/* Informations de période */}
-      <div className="text-center text-sm text-gray-600 mb-6">
-      Period analyzed : from {new Date(selectedPeriod.start).toLocaleDateString('fr-CH')} to {new Date(selectedPeriod.end).toLocaleDateString('fr-CH')}
-      </div>
-
       {/* Boutons d'export mis à jour */}
       <div className="flex items-center justify-center gap-4">
         <button

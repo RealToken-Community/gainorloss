@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import { TOKENS } from '../utils/constants';
 import Chart from '../components/Chart';
 import TransactionsTable from '../components/TransactionsTable';
 import FinancialSummary from '../components/FinancialSummary';
+import FiltersBar from '../components/FiltersBar';
 
 // Types pour les données de l'API V3
 interface DailyDetail {
@@ -121,6 +122,136 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCollapsed, setCollapsed] = useState(true);
+  
+  // Filtres partagés entre FinancialSummary et TransactionsTable
+  const [selectedTokens, setSelectedTokens] = useState<string[]>(['USDC', 'WXDAI', 'WXDAI_V2']);
+  
+  // Fonction pour calculer la date range par défaut depuis les données
+  const calculateDefaultDateRange = (): { start: string; end: string } => {
+    const allDates: string[] = [];
+    
+    // Collecter toutes les dates des données V3
+    const usdcData = data?.data?.results?.[0]?.data?.interests?.USDC;
+    const wxdaiData = data?.data?.results?.[0]?.data?.interests?.WXDAI;
+    const v2Data = dataV2?.data?.results?.[0]?.data?.interests?.WXDAI;
+    
+    if (usdcData?.borrow?.dailyDetails) {
+      usdcData.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+    }
+    if (usdcData?.supply?.dailyDetails) {
+      usdcData.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+    }
+    if (wxdaiData?.borrow?.dailyDetails) {
+      wxdaiData.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+    }
+    if (wxdaiData?.supply?.dailyDetails) {
+      wxdaiData.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+    }
+    if (v2Data?.borrow?.dailyDetails) {
+      v2Data.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+    }
+    if (v2Data?.supply?.dailyDetails) {
+      v2Data.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+    }
+    
+    // Collecter toutes les dates des transactions (sans filtre pour calculer la plage complète)
+    const transactions = prepareAllTransactions();
+    if (transactions) {
+      transactions.forEach((tx: any) => {
+        const date = new Date(tx.timestamp * 1000);
+        const dateString = date.toISOString().split('T')[0];
+        allDates.push(dateString);
+      });
+    }
+    
+    // Trouver la date la plus ancienne
+    if (allDates.length > 0) {
+      // Convertir les dates YYYYMMDD en YYYY-MM-DD pour le tri
+      const sortedDates = allDates
+        .map(date => {
+          // Si format YYYYMMDD, convertir en YYYY-MM-DD
+          if (date.length === 8 && !date.includes('-')) {
+            return `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+          }
+          return date;
+        })
+        .sort();
+      const oldestDate = sortedDates[0];
+      return {
+        start: oldestDate,
+        end: new Date().toISOString().split('T')[0] // Aujourd'hui
+      };
+    }
+    
+    // Fallback : 1er janvier de l'année en cours
+    const today = new Date().toISOString().split('T')[0];
+    const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+    return { start: startOfYear, end: today };
+  };
+  
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+    return { start: startOfYear, end: today };
+  });
+  
+  // Mettre à jour la date range quand les données sont chargées
+  useEffect(() => {
+    if (data || dataV2) {
+      // Recalculer avec une fonction inline pour éviter les dépendances circulaires
+      const allDates: string[] = [];
+      
+      const usdcData = data?.data?.results?.[0]?.data?.interests?.USDC;
+      const wxdaiData = data?.data?.results?.[0]?.data?.interests?.WXDAI;
+      const v2Data = dataV2?.data?.results?.[0]?.data?.interests?.WXDAI;
+      
+      if (usdcData?.borrow?.dailyDetails) {
+        usdcData.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+      }
+      if (usdcData?.supply?.dailyDetails) {
+        usdcData.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+      }
+      if (wxdaiData?.borrow?.dailyDetails) {
+        wxdaiData.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+      }
+      if (wxdaiData?.supply?.dailyDetails) {
+        wxdaiData.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+      }
+      if (v2Data?.borrow?.dailyDetails) {
+        v2Data.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+      }
+      if (v2Data?.supply?.dailyDetails) {
+        v2Data.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
+      }
+      
+      // Collecter les dates des transactions (sans filtre pour calculer la plage complète)
+      const transactions = prepareAllTransactions();
+      if (transactions) {
+        transactions.forEach((tx: any) => {
+          const date = new Date(tx.timestamp * 1000);
+          const dateString = date.toISOString().split('T')[0];
+          allDates.push(dateString);
+        });
+      }
+      
+      if (allDates.length > 0) {
+        const sortedDates = allDates
+          .map(date => {
+            if (date.length === 8 && !date.includes('-')) {
+              return `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+            }
+            return date;
+          })
+          .sort();
+        const oldestDate = sortedDates[0];
+        setDateRange({
+          start: oldestDate,
+          end: new Date().toISOString().split('T')[0]
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, dataV2]);
 
   // Fonction pour formater les montants (conversion depuis base units)
   const formatAmount = (amount: string, decimals = 6): number => {
@@ -135,25 +266,68 @@ export default function Home() {
     return `${day}/${month}/${year}`;
   };
 
-  // Corriger la fonction prepareChartData pour filtrer selon showEstimatedPoints
-  const prepareChartData = (dailyDetails: DailyDetail[], valueKey: 'debt' | 'supply', decimals = 6) => {
+  // Fonction pour normaliser une date en YYYY-MM-DD pour comparaison
+  const normalizeDate = (date: string): string => {
+    // Si format YYYYMMDD (8 caractères sans tiret)
+    if (date.length === 8 && !date.includes('-')) {
+      return `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+    }
+    // Si déjà en YYYY-MM-DD
+    return date;
+  };
+
+  // Fonction pour vérifier si une date est dans la plage
+  const isDateInRange = (date: string, start: string, end: string): boolean => {
+    const normalizedDate = normalizeDate(date);
+    const normalizedStart = normalizeDate(start);
+    const normalizedEnd = normalizeDate(end);
+    return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
+  };
+
+  // Fonction prepareChartData avec filtrage par date
+  const prepareChartData = (
+    dailyDetails: DailyDetail[], 
+    valueKey: 'debt' | 'supply', 
+    decimals = 6,
+    dateRange?: { start: string; end: string }
+  ) => {
     if (!dailyDetails || dailyDetails.length === 0) return [];
     
-    return dailyDetails.map(detail => ({
+    // Filtrer par date si dateRange est fourni
+    let filteredDetails = dailyDetails;
+    if (dateRange) {
+      filteredDetails = dailyDetails.filter(detail => 
+        isDateInRange(detail.date, dateRange.start, dateRange.end)
+      );
+    }
+    
+    return filteredDetails.map(detail => ({
       date: detail.date,
       value: formatAmount(detail[valueKey] || '0', decimals),
       formattedDate: formatDate(detail.date)
     }));
   };
 
-  // Fonction pour préparer les données V2 pour Recharts
-  const prepareV2ChartData = (transactions: V2Transaction[]) => {
+  // Fonction pour préparer les données V2 pour Recharts avec filtrage par date
+  const prepareV2ChartData = (
+    transactions: V2Transaction[],
+    dateRange?: { start: string; end: string }
+  ) => {
+    // Filtrer les transactions par date si dateRange est fourni
+    let filteredTransactions = transactions;
+    if (dateRange) {
+      filteredTransactions = transactions.filter(tx => {
+        const txDate = new Date(tx.timestamp * 1000).toISOString().split('T')[0];
+        return isDateInRange(txDate, dateRange.start, dateRange.end);
+      });
+    }
+    
     // Calculer la dette cumulée pour V2 (avec support des valeurs négatives)
     let cumulativeDebt = 0;
     const chartData: Array<{date: string; value: number; formattedDate: string; type?: string; amount?: number; timestamp?: number}> = [];
     
     // Trier les transactions par timestamp
-    const sortedTransactions = [...transactions].sort((a, b) => a.timestamp - b.timestamp);
+    const sortedTransactions = [...filteredTransactions].sort((a, b) => a.timestamp - b.timestamp);
     
     for (const tx of sortedTransactions) {
       if (tx.type === 'borrow') {
@@ -175,8 +349,8 @@ export default function Home() {
     return chartData;
   };
 
-  // Fonction pour préparer toutes les transactions pour le tableau
-  const prepareAllTransactions = () => {
+  // Fonction pour préparer toutes les transactions pour le tableau avec filtrage par date
+  const prepareAllTransactions = (dateRange?: { start: string; end: string }) => {
     const allTransactions: any[] = [];
 
     // Ajouter les transactions V3
@@ -264,8 +438,17 @@ export default function Home() {
       });
     }
 
+    // Filtrer par date si dateRange est fourni
+    let filteredTransactions = allTransactions;
+    if (dateRange) {
+      filteredTransactions = allTransactions.filter(tx => {
+        const txDate = new Date(tx.timestamp * 1000).toISOString().split('T')[0];
+        return isDateInRange(txDate, dateRange.start, dateRange.end);
+      });
+    }
+    
     // Trier par timestamp décroissant (plus récent en premier)
-    return allTransactions.sort((a, b) => b.timestamp - a.timestamp);
+    return filteredTransactions.sort((a, b) => b.timestamp - a.timestamp);
   };
 
 
@@ -387,30 +570,32 @@ export default function Home() {
         </Head>
 
         <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+          {/* Barre de filtres fixe en haut */}
+          <FiltersBar
+            selectedTokens={selectedTokens}
+            onTokensChange={setSelectedTokens}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            onReset={() => {
+              setSelectedTokens(['USDC', 'WXDAI', 'WXDAI_V2']);
+              const calculatedRange = calculateDefaultDateRange();
+              setDateRange(calculatedRange);
+            }}
+            address={address}
+            onResetAddress={resetForm}
+          />
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="text-center sm:text-left">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">RMM Analytics</h1>
-                  <p className="text-sm sm:text-base text-gray-600">
-                    Address: <span className="font-mono bg-gray-100 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm break-all">{address}</span>
-                  </p>
-                </div>
-                <button 
-                  onClick={resetForm}
-                  className="w-full sm:w-auto bg-gray-900 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base"
-                >
-                  Try another address
-                </button>
-              </div>
-            </div>
+          {/* Contenu principal avec padding-top pour éviter le chevauchement */}
+          <div className="pt-24 sm:pt-28">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             <FinancialSummary
               usdcData={usdcData}
               wxdaiData={wxdaiData}
               v2Data={dataV2?.data?.results?.[0]?.data?.interests?.WXDAI}
               userAddress={address}
-              transactions={prepareAllTransactions()} 
+              transactions={prepareAllTransactions(dateRange)}
+              selectedTokens={selectedTokens}
+              dateRange={dateRange}
             />
 
             {/* Erreur */}
@@ -432,19 +617,19 @@ export default function Home() {
                   <div className="bg-red-50 border border-red-100 p-6 rounded-xl">
                     <h3 className="text-sm font-medium text-red-700 mb-2">Borrow Interest</h3>
                     <p className="text-3xl font-bold text-red-600">
-                      {formatAmount(usdcTotalDebtInterest).toFixed(2)} USDC
+                      {formatAmount(usdcTotalDebtInterest.toString()).toFixed(2)} USDC
                     </p>
                   </div>
                   <div className="bg-green-50 border border-green-100 p-6 rounded-xl">
                     <h3 className="text-sm font-medium text-green-700 mb-2">Supply Interest</h3>
                     <p className="text-3xl font-bold text-green-600">
-                      {formatAmount(usdcTotalSupplyInterest).toFixed(2)} USDC
+                      {formatAmount(usdcTotalSupplyInterest.toString()).toFixed(2)} USDC
                     </p>
                   </div>
                   <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
                     <h3 className="text-sm font-medium text-blue-700 mb-2">PnL Net</h3>
                     <p className={`text-3xl font-bold ${usdcNetInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatAmount(usdcNetInterest).toFixed(2)} USDC
+                      {formatAmount(usdcNetInterest.toString()).toFixed(2)} USDC
                     </p>
                   </div>
                 </div>
@@ -455,7 +640,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Graphique Dette USDC */}
               <Chart
-                data={prepareChartData(usdcBorrowDetails, 'debt', 6)}
+                data={prepareChartData(usdcBorrowDetails, 'debt', 6, dateRange)}
                 title="USDC Debt Evolution"
                 color="#dc2626"
                 type="line"
@@ -465,7 +650,7 @@ export default function Home() {
 
               {/* Graphique Supply USDC */}
               <Chart
-                data={prepareChartData(usdcSupplyDetails, 'supply', 6)}
+                data={prepareChartData(usdcSupplyDetails, 'supply', 6, dateRange)}
                 title="USDC Supply Evolution"
                 color="#059669"
                 type="area"
@@ -482,19 +667,19 @@ export default function Home() {
                   <div className="bg-red-50 border border-red-100 p-6 rounded-xl">
                     <h3 className="text-sm font-medium text-red-700 mb-2">Borrow Interest</h3>
                     <p className="text-3xl font-bold text-red-600">
-                      {formatAmount(wxdaiTotalDebtInterest, 18).toFixed(2)} WXDAI
+                      {formatAmount(wxdaiTotalDebtInterest.toString(), 18).toFixed(2)} WXDAI
                     </p>
                   </div>
                   <div className="bg-green-50 border border-green-100 p-6 rounded-xl">
                     <h3 className="text-sm font-medium text-green-700 mb-2">Supply Interest</h3>
                     <p className="text-3xl font-bold text-green-600">
-                      {formatAmount(wxdaiTotalSupplyInterest, 18).toFixed(2)} WXDAI
+                      {formatAmount(wxdaiTotalSupplyInterest.toString(), 18).toFixed(2)} WXDAI
                     </p>
                   </div>
                   <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
                     <h3 className="text-sm font-medium text-blue-700 mb-2">PnL Net</h3>
                     <p className={`text-3xl font-bold ${wxdaiNetInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatAmount(wxdaiNetInterest, 18).toFixed(2)} WXDAI
+                      {formatAmount(wxdaiNetInterest.toString(), 18).toFixed(2)} WXDAI
                     </p>
                   </div>
                 </div>
@@ -505,7 +690,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Graphique Dette WXDAI */}
               <Chart
-                data={prepareChartData(wxdaiBorrowDetails, 'debt', 18)}
+                data={prepareChartData(wxdaiBorrowDetails, 'debt', 18, dateRange)}
                 title="WXDAI Debt Evolution"
                 color="#dc2626"
                 type="line"
@@ -515,7 +700,7 @@ export default function Home() {
                     
               {/* Graphique Supply WXDAI */}
               <Chart
-                data={prepareChartData(wxdaiSupplyDetails, 'supply', 18)}
+                data={prepareChartData(wxdaiSupplyDetails, 'supply', 18, dateRange)}
                 title="WXDAI Supply Evolution"
                 color="#059669"
                 type="area"
@@ -555,19 +740,19 @@ export default function Home() {
                                 <div className="bg-red-50 border border-red-100 p-6 rounded-xl">
                                   <h3 className="text-sm font-medium text-red-700 mb-2">Borrow Interest</h3>
                                   <p className="text-3xl font-bold text-red-600">
-                                    {formatAmount(v2WxdaiData.borrow.totalInterest, 18).toFixed(2)} WXDAI
+                                    {formatAmount(v2WxdaiData.borrow.totalInterest.toString(), 18).toFixed(2)} WXDAI
                                   </p>
                                 </div>
                                 <div className="bg-green-50 border border-green-100 p-6 rounded-xl">
                                   <h3 className="text-sm font-medium text-green-700 mb-2">Supply Interest</h3>
                                   <p className="text-3xl font-bold text-green-600">
-                                    {formatAmount(v2WxdaiData.supply.totalInterest, 18).toFixed(2)} WXDAI
+                                    {formatAmount(v2WxdaiData.supply.totalInterest.toString(), 18).toFixed(2)} WXDAI
                                   </p>
                                 </div>
                                 <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
                                   <h3 className="text-sm font-medium text-blue-700 mb-2">PnL Net</h3>
                                   <p className={`text-3xl font-bold ${(parseFloat(v2WxdaiData.supply.totalInterest) - parseFloat(v2WxdaiData.borrow.totalInterest)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatAmount(parseFloat(v2WxdaiData.supply.totalInterest) - parseFloat(v2WxdaiData.borrow.totalInterest), 18).toFixed(2)} WXDAI
+                                    {formatAmount((parseFloat(v2WxdaiData.supply.totalInterest) - parseFloat(v2WxdaiData.borrow.totalInterest)).toString(), 18).toFixed(2)} WXDAI
                                   </p>
                                 </div>
                               </div>
@@ -577,7 +762,7 @@ export default function Home() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                               {/* Graphique Dette WXDAI v2 */}
                               <Chart
-                                data={prepareChartData(v2WxdaiBorrowDetails, 'debt', 18)}
+                                data={prepareChartData(v2WxdaiBorrowDetails, 'debt', 18, dateRange)}
                                 title="WXDAI Debt Evolution (v2)"
                                 color="#f59e0b"
                                 type="line"
@@ -587,7 +772,7 @@ export default function Home() {
 
                               {/* Graphique Supply WXDAI v2 */}
                               <Chart
-                                data={prepareChartData(v2WxdaiSupplyDetails, 'supply', 18)}
+                                data={prepareChartData(v2WxdaiSupplyDetails, 'supply', 18, dateRange)}
                                 title="WXDAI Supply Evolution (v2)"
                                 color="#3b82f6"
                                 type="area"
@@ -614,15 +799,18 @@ export default function Home() {
             )}
 
             {/* Tableau des transactions unifié */}
-            {(data || dataV2) && prepareAllTransactions().length > 0 && (
+            {(data || dataV2) && prepareAllTransactions(dateRange).length > 0 && (
               <TransactionsTable 
-                transactions={prepareAllTransactions()}
+                transactions={prepareAllTransactions(dateRange)}
                 userAddress={address}
                 title="Transactions"
                 isCollapsed={isCollapsed}
                 onToggleCollapse={() => setCollapsed(!isCollapsed)}
+                selectedTokens={selectedTokens}
+                dateRange={dateRange}
               />
             )}
+            </div>
           </div>
         </div>
       </>

@@ -4,8 +4,9 @@ const { fetchAllTransactionsV3, transformTransactionsV3ToFrontendFormat } = requ
 
 /**
  * Configuration depuis les variables d'environnement
+ * Utilise NEXT_PUBLIC_GNOSIS_RPC_URL comme fallback pour compatibilité avec le .env partagé
  */
-const GNOSIS_RPC_URL = process.env.GNOSIS_RPC_URL || 'https://rpc.gnosischain.com/';
+const GNOSIS_RPC_URL = process.env.GNOSIS_RPC_URL || process.env.NEXT_PUBLIC_GNOSIS_RPC_URL || 'https://rpc.gnosischain.com/';
 const RAY = BigInt(10 ** 27);
 const { TOKENS } = require('../../utils/constants');
 

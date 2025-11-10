@@ -1,15 +1,20 @@
-const { GraphQLClient } = require('graphql-request');
-
 // Configuration TheGraph
 const THEGRAPH_URL = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
 const API_KEY = process.env.THEGRAPH_API_KEY;
 
-// Client GraphQL
-const client = new GraphQLClient(THEGRAPH_URL, {
-  headers: API_KEY ? {
-    'Authorization': `Bearer ${API_KEY}`
-  } : {}
-});
+// Client GraphQL (utilise un import dynamique pour ES modules)
+let client = null;
+async function getClient() {
+  if (!client) {
+    const { GraphQLClient } = await import('graphql-request');
+    client = new GraphQLClient(THEGRAPH_URL, {
+      headers: API_KEY ? {
+        'Authorization': `Bearer ${API_KEY}`
+      } : {}
+    });
+  }
+  return client;
+}
 
 const sTokenBalance_QUERY = `query ATokenMovements($user: String!, $first: Int!, $skip: Int!) {
   atokenBalanceHistoryItems(
@@ -68,7 +73,8 @@ async function fetchAllATokenBalances(userAddress) {
         skip: skip
       };
       
-      const data = await client.request(sTokenBalance_QUERY, variables);
+      const graphqlClient = await getClient();
+      const data = await graphqlClient.request(sTokenBalance_QUERY, variables);
       const balances = data.atokenBalanceHistoryItems || [];
       
       // Filtrer seulement USDC et WXDAI
@@ -84,7 +90,7 @@ async function fetchAllATokenBalances(userAddress) {
         hasMore = false;
       } else {
         skip += LIMIT;
-        console.log(`⏭️  Pagination suivante: skip=${skip}`);
+        console.log(`⏭️  Pagination suivante2: skip=${skip}`);
       }
     }
     
@@ -116,7 +122,8 @@ async function fetchAllVTokenBalances(userAddress, req = null) {
         skip: skip
       };
       
-      const data = await client.request(dTokenBalance_QUERY, variables);
+      const graphqlClient = await getClient();
+      const data = await graphqlClient.request(dTokenBalance_QUERY, variables);
       const balances = data.vtokenBalanceHistoryItems || [];
       
       // Filtrer seulement USDC et WXDAI
@@ -132,7 +139,7 @@ async function fetchAllVTokenBalances(userAddress, req = null) {
         hasMore = false;
       } else {
         skip += LIMIT;
-        console.log(`⏭️  Pagination suivante: skip=${skip}`);
+        console.log(`⏭️  Pagination suivante3: skip=${skip}`);
       }
     }
     
