@@ -4,6 +4,7 @@ import { TOKENS } from '../utils/constants';
 import Chart from '../components/Chart';
 import TransactionsTable from '../components/TransactionsTable';
 import FinancialSummary from '../components/FinancialSummary';
+import FiltersBar from '../components/FiltersBar';
 
 // Types pour les données de l'API V3
 interface DailyDetail {
@@ -153,7 +154,7 @@ export default function Home() {
       v2Data.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
     }
     
-    // Collecter toutes les dates des transactions
+    // Collecter toutes les dates des transactions (sans filtre pour calculer la plage complète)
     const transactions = prepareAllTransactions();
     if (transactions) {
       transactions.forEach((tx: any) => {
@@ -223,7 +224,7 @@ export default function Home() {
         v2Data.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
       }
       
-      // Collecter les dates des transactions
+      // Collecter les dates des transactions (sans filtre pour calculer la plage complète)
       const transactions = prepareAllTransactions();
       if (transactions) {
         transactions.forEach((tx: any) => {
@@ -265,25 +266,68 @@ export default function Home() {
     return `${day}/${month}/${year}`;
   };
 
-  // Corriger la fonction prepareChartData pour filtrer selon showEstimatedPoints
-  const prepareChartData = (dailyDetails: DailyDetail[], valueKey: 'debt' | 'supply', decimals = 6) => {
+  // Fonction pour normaliser une date en YYYY-MM-DD pour comparaison
+  const normalizeDate = (date: string): string => {
+    // Si format YYYYMMDD (8 caractères sans tiret)
+    if (date.length === 8 && !date.includes('-')) {
+      return `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+    }
+    // Si déjà en YYYY-MM-DD
+    return date;
+  };
+
+  // Fonction pour vérifier si une date est dans la plage
+  const isDateInRange = (date: string, start: string, end: string): boolean => {
+    const normalizedDate = normalizeDate(date);
+    const normalizedStart = normalizeDate(start);
+    const normalizedEnd = normalizeDate(end);
+    return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
+  };
+
+  // Fonction prepareChartData avec filtrage par date
+  const prepareChartData = (
+    dailyDetails: DailyDetail[], 
+    valueKey: 'debt' | 'supply', 
+    decimals = 6,
+    dateRange?: { start: string; end: string }
+  ) => {
     if (!dailyDetails || dailyDetails.length === 0) return [];
     
-    return dailyDetails.map(detail => ({
+    // Filtrer par date si dateRange est fourni
+    let filteredDetails = dailyDetails;
+    if (dateRange) {
+      filteredDetails = dailyDetails.filter(detail => 
+        isDateInRange(detail.date, dateRange.start, dateRange.end)
+      );
+    }
+    
+    return filteredDetails.map(detail => ({
       date: detail.date,
       value: formatAmount(detail[valueKey] || '0', decimals),
       formattedDate: formatDate(detail.date)
     }));
   };
 
-  // Fonction pour préparer les données V2 pour Recharts
-  const prepareV2ChartData = (transactions: V2Transaction[]) => {
+  // Fonction pour préparer les données V2 pour Recharts avec filtrage par date
+  const prepareV2ChartData = (
+    transactions: V2Transaction[],
+    dateRange?: { start: string; end: string }
+  ) => {
+    // Filtrer les transactions par date si dateRange est fourni
+    let filteredTransactions = transactions;
+    if (dateRange) {
+      filteredTransactions = transactions.filter(tx => {
+        const txDate = new Date(tx.timestamp * 1000).toISOString().split('T')[0];
+        return isDateInRange(txDate, dateRange.start, dateRange.end);
+      });
+    }
+    
     // Calculer la dette cumulée pour V2 (avec support des valeurs négatives)
     let cumulativeDebt = 0;
     const chartData: Array<{date: string; value: number; formattedDate: string; type?: string; amount?: number; timestamp?: number}> = [];
     
     // Trier les transactions par timestamp
-    const sortedTransactions = [...transactions].sort((a, b) => a.timestamp - b.timestamp);
+    const sortedTransactions = [...filteredTransactions].sort((a, b) => a.timestamp - b.timestamp);
     
     for (const tx of sortedTransactions) {
       if (tx.type === 'borrow') {
@@ -305,8 +349,8 @@ export default function Home() {
     return chartData;
   };
 
-  // Fonction pour préparer toutes les transactions pour le tableau
-  const prepareAllTransactions = () => {
+  // Fonction pour préparer toutes les transactions pour le tableau avec filtrage par date
+  const prepareAllTransactions = (dateRange?: { start: string; end: string }) => {
     const allTransactions: any[] = [];
 
     // Ajouter les transactions V3
@@ -394,8 +438,17 @@ export default function Home() {
       });
     }
 
+    // Filtrer par date si dateRange est fourni
+    let filteredTransactions = allTransactions;
+    if (dateRange) {
+      filteredTransactions = allTransactions.filter(tx => {
+        const txDate = new Date(tx.timestamp * 1000).toISOString().split('T')[0];
+        return isDateInRange(txDate, dateRange.start, dateRange.end);
+      });
+    }
+    
     // Trier par timestamp décroissant (plus récent en premier)
-    return allTransactions.sort((a, b) => b.timestamp - a.timestamp);
+    return filteredTransactions.sort((a, b) => b.timestamp - a.timestamp);
   };
 
 
@@ -517,103 +570,30 @@ export default function Home() {
         </Head>
 
         <div className="min-h-screen bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
+          {/* Barre de filtres fixe en haut */}
+          <FiltersBar
+            selectedTokens={selectedTokens}
+            onTokensChange={setSelectedTokens}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            onReset={() => {
+              setSelectedTokens(['USDC', 'WXDAI', 'WXDAI_V2']);
+              const calculatedRange = calculateDefaultDateRange();
+              setDateRange(calculatedRange);
+            }}
+            address={address}
+            onResetAddress={resetForm}
+          />
 
-            {/* Encart unifié : RMM Analytics + Filters */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8">
-              {/* Header : Titre et adresse */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
-                <div className="text-center sm:text-left">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">RMM GainOrLoss</h1>
-                  <p className="text-sm sm:text-base text-gray-600">
-                    Interest analytics and transaction history for your RMM positions.
-                    <br />
-                    Address: <span className="font-mono bg-gray-100 px-2 sm:px-3 py-1 rounded-lg text-xs sm:text-sm break-all">{address}</span>
-                  </p>
-                </div>
-                <button 
-                  onClick={resetForm}
-                  className="w-full sm:w-auto bg-gray-900 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl hover:bg-gray-800 transition-colors font-medium text-sm sm:text-base"
-                >
-                  Try another address
-                </button>
-              </div>
-
-              {/* Section de filtres partagés */}
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Pick only what you want to see</h2>
-                <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-                  {/* Sélection des tokens */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="text-sm font-medium text-gray-700">Tokens:</label>
-                    {[
-                      { key: 'USDC', label: 'USDC' },
-                      { key: 'WXDAI', label: 'WXDAI' },
-                      { key: 'WXDAI_V2', label: 'WXDAI V2' }
-                    ].map(({ key, label }) => (
-                      <label key={key} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedTokens.includes(key)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedTokens([...selectedTokens, key]);
-                            } else {
-                              setSelectedTokens(selectedTokens.filter(t => t !== key));
-                            }
-                          }}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-700">{label}</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  {/* Sélection de la plage de dates */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">From:</label>
-                      <input
-                        type="date"
-                        lang="en"
-                        value={dateRange.start}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">To:</label>
-                      <input
-                        type="date"
-                        lang="en"
-                        value={dateRange.end}
-                        onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Bouton Reset */}
-                  <button
-                    onClick={() => {
-                      setSelectedTokens(['USDC', 'WXDAI', 'WXDAI_V2']);
-                      const calculatedRange = calculateDefaultDateRange();
-                      setDateRange(calculatedRange);
-                    }}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
-                  >
-                    🔄 Reset Filters
-                  </button>
-                </div>
-              </div>
-            </div>
-
+          {/* Contenu principal avec padding-top pour éviter le chevauchement */}
+          <div className="pt-24 sm:pt-28">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
             <FinancialSummary
               usdcData={usdcData}
               wxdaiData={wxdaiData}
               v2Data={dataV2?.data?.results?.[0]?.data?.interests?.WXDAI}
               userAddress={address}
-              transactions={prepareAllTransactions()}
+              transactions={prepareAllTransactions(dateRange)}
               selectedTokens={selectedTokens}
               dateRange={dateRange}
             />
@@ -660,7 +640,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Graphique Dette USDC */}
               <Chart
-                data={prepareChartData(usdcBorrowDetails, 'debt', 6)}
+                data={prepareChartData(usdcBorrowDetails, 'debt', 6, dateRange)}
                 title="USDC Debt Evolution"
                 color="#dc2626"
                 type="line"
@@ -670,7 +650,7 @@ export default function Home() {
 
               {/* Graphique Supply USDC */}
               <Chart
-                data={prepareChartData(usdcSupplyDetails, 'supply', 6)}
+                data={prepareChartData(usdcSupplyDetails, 'supply', 6, dateRange)}
                 title="USDC Supply Evolution"
                 color="#059669"
                 type="area"
@@ -710,7 +690,7 @@ export default function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Graphique Dette WXDAI */}
               <Chart
-                data={prepareChartData(wxdaiBorrowDetails, 'debt', 18)}
+                data={prepareChartData(wxdaiBorrowDetails, 'debt', 18, dateRange)}
                 title="WXDAI Debt Evolution"
                 color="#dc2626"
                 type="line"
@@ -720,7 +700,7 @@ export default function Home() {
                     
               {/* Graphique Supply WXDAI */}
               <Chart
-                data={prepareChartData(wxdaiSupplyDetails, 'supply', 18)}
+                data={prepareChartData(wxdaiSupplyDetails, 'supply', 18, dateRange)}
                 title="WXDAI Supply Evolution"
                 color="#059669"
                 type="area"
@@ -782,7 +762,7 @@ export default function Home() {
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                               {/* Graphique Dette WXDAI v2 */}
                               <Chart
-                                data={prepareChartData(v2WxdaiBorrowDetails, 'debt', 18)}
+                                data={prepareChartData(v2WxdaiBorrowDetails, 'debt', 18, dateRange)}
                                 title="WXDAI Debt Evolution (v2)"
                                 color="#f59e0b"
                                 type="line"
@@ -792,7 +772,7 @@ export default function Home() {
 
                               {/* Graphique Supply WXDAI v2 */}
                               <Chart
-                                data={prepareChartData(v2WxdaiSupplyDetails, 'supply', 18)}
+                                data={prepareChartData(v2WxdaiSupplyDetails, 'supply', 18, dateRange)}
                                 title="WXDAI Supply Evolution (v2)"
                                 color="#3b82f6"
                                 type="area"
@@ -819,9 +799,9 @@ export default function Home() {
             )}
 
             {/* Tableau des transactions unifié */}
-            {(data || dataV2) && prepareAllTransactions().length > 0 && (
+            {(data || dataV2) && prepareAllTransactions(dateRange).length > 0 && (
               <TransactionsTable 
-                transactions={prepareAllTransactions()}
+                transactions={prepareAllTransactions(dateRange)}
                 userAddress={address}
                 title="Transactions"
                 isCollapsed={isCollapsed}
@@ -830,6 +810,7 @@ export default function Home() {
                 dateRange={dateRange}
               />
             )}
+            </div>
           </div>
         </div>
       </>

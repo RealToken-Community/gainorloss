@@ -433,7 +433,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Financial Summary</h2>
         <p className="text-sm text-gray-600">
-          Period: {new Date(dateRange.start).toLocaleDateString('fr-CH')} - {new Date(dateRange.end).toLocaleDateString('fr-CH')}
+          Period analyzed from {new Date(dateRange.start).toLocaleDateString('fr-CH')} to {new Date(dateRange.end).toLocaleDateString('fr-CH')}
         </p>
       </div>
 
@@ -520,12 +520,6 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
           </tbody>
         </table>
       </div>
-
-      {/* Informations de période */}
-      <div className="text-center text-sm text-gray-600 mb-6">
-       Period analyzed : from {new Date(dateRange.start).toLocaleDateString('fr-CH')} to {new Date(dateRange.end).toLocaleDateString('fr-CH')}
-      </div>
-
       {/* Boutons d'export mis à jour */}
       <div className="flex items-center justify-center gap-4">
         <button
