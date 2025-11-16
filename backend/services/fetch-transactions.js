@@ -9,25 +9,32 @@ async function getClient() {
   if (!client) {
     const { GraphQLClient } = await import('graphql-request');
     client = new GraphQLClient(THEGRAPH_URL_V3, {
-      headers: API_KEY ? {
-        'Authorization': `Bearer ${API_KEY}`
-      } : {}
+      headers: {
+        ...(API_KEY ? { 'Authorization': `Bearer ${API_KEY}` } : {}),
+      }
     });
   }
   return client;
 }
 
-// Requête pour récupérer toutes les transactions avec pagination (V3 uniquement)
-const TRANSACTIONS_QUERY_V3 = `
-  query GetTransactionsV3($userAddress: String!, $first: Int!, $skip: Int!) {
+/**
+ * Génère dynamiquement la requête GraphQL en fonction des types de transactions à récupérer
+ * @param {Object} typesToFetch - Objet avec les flags pour chaque type { borrows, supplies, withdraws, repays }
+ * @returns {string} - Requête GraphQL
+ */
+function buildTransactionsQueryV3(typesToFetch) {
+  const queryParts = [];
+  
+  if (typesToFetch.borrows) {
+    queryParts.push(`
     borrows: borrows(
       first: $first
-      skip: $skip
+      skip: $skipBorrows
       where: { user_: { id: $userAddress } }
       orderBy: timestamp
       orderDirection: asc
     ) {
-      id           # Seulement l'id, on extrait le txHash
+      id
       reserve { 
         id
         symbol
@@ -35,16 +42,19 @@ const TRANSACTIONS_QUERY_V3 = `
       }
       amount
       timestamp
-    }
-    
+    }`);
+  }
+  
+  if (typesToFetch.supplies) {
+    queryParts.push(`
     supplies: supplies(
       first: $first
-      skip: $skip
+      skip: $skipSupplies
       where: { user_: { id: $userAddress } }
       orderBy: timestamp
       orderDirection: asc
     ) {
-      id           # Seulement l'id, on extrait le txHash
+      id
       reserve { 
         id
         symbol
@@ -52,16 +62,19 @@ const TRANSACTIONS_QUERY_V3 = `
       }
       amount
       timestamp
-    }
-    
+    }`);
+  }
+  
+  if (typesToFetch.withdraws) {
+    queryParts.push(`
     withdraws: redeemUnderlyings(
       first: $first
-      skip: $skip
+      skip: $skipWithdraws
       where: { user_: { id: $userAddress } }
       orderBy: timestamp
       orderDirection: asc
     ) {
-      id           # Seulement l'id, on extrait le txHash
+      id
       reserve { 
         id
         symbol
@@ -69,16 +82,19 @@ const TRANSACTIONS_QUERY_V3 = `
       }
       amount
       timestamp
-    }
-    
+    }`);
+  }
+  
+  if (typesToFetch.repays) {
+    queryParts.push(`
     repays: repays(
       first: $first
-      skip: $skip
+      skip: $skipRepays
       where: { user_: { id: $userAddress } }
       orderBy: timestamp
       orderDirection: asc
     ) {
-      id           # extrait le txHash
+      id
       reserve { 
         id
         symbol
@@ -86,14 +102,30 @@ const TRANSACTIONS_QUERY_V3 = `
       }
       amount
       timestamp
-    }
+    }`);
+  }
+  
+  return `
+  query GetTransactionsV3(
+    $userAddress: String!
+    $first: Int!
+    $skipBorrows: Int!
+    $skipSupplies: Int!
+    $skipWithdraws: Int!
+    $skipRepays: Int!
+  ) {
+    ${queryParts.join('\n')}
   }
 `;
+}
 
 /**
  * Récupère toutes les transactions V3 d'une adresse avec pagination
+ * Utilise une pagination indépendante pour chaque type de transaction
+ * @param {string} userAddress - Adresse de l'utilisateur
+ * @param {boolean} debug - Si true, affiche les logs détaillés (défaut: false)
  */
-async function fetchAllTransactionsV3(userAddress) {
+async function fetchAllTransactionsV3(userAddress, debug = false) {
   const LIMIT = 1000;
   const allTransactions = {
     borrows: [],
@@ -101,54 +133,149 @@ async function fetchAllTransactionsV3(userAddress) {
     withdraws: [],
     repays: []
   };
-  let skip = 0;
-  let hasMore = true;
+  
+  // Skip séparé pour chaque type de transaction
+  const skip = {
+    borrows: 0,
+    supplies: 0,
+    withdraws: 0,
+    repays: 0
+  };
+  
+  // Flags pour indiquer si chaque type a atteint sa limite
+  const limitReached = {
+    borrows: false,
+    supplies: false,
+    withdraws: false,
+    repays: false
+  };
 
   try {
+    if (debug) {
+      console.log(`🚀 Début de la récupération des transactions V3 pour ${userAddress}`);
+    }
+    let batchNumber = 0;
 
-    while (hasMore) {
+    // Continuer tant qu'au moins un type n'a pas atteint sa limite
+    while (!limitReached.borrows || !limitReached.supplies || !limitReached.withdraws || !limitReached.repays) {
+      batchNumber++;
+      
+      // Déterminer quels types doivent être récupérés
+      const typesToFetch = {
+        borrows: !limitReached.borrows,
+        supplies: !limitReached.supplies,
+        withdraws: !limitReached.withdraws,
+        repays: !limitReached.repays
+      };
+      
+      // Générer la requête dynamiquement
+      const query = buildTransactionsQueryV3(typesToFetch);
+      
+      // Préparer les variables pour la requête
       const variables = {
         userAddress: userAddress.toLowerCase(),
         first: LIMIT,
-        skip: skip
+        skipBorrows: skip.borrows,
+        skipSupplies: skip.supplies,
+        skipWithdraws: skip.withdraws,
+        skipRepays: skip.repays
       };
 
       const graphqlClient = await getClient();
-      const data = await graphqlClient.request(TRANSACTIONS_QUERY_V3, variables);
+      const data = await graphqlClient.request(query, variables);
 
       const validSymbols = ['USDC', 'WXDAI'];
 
-      // Ajouter les transactions filtrées de ce batch
-      allTransactions.borrows.push(...(data.borrows || []).filter(tx =>
-        validSymbols.includes(tx.reserve?.symbol)
-      ));
+      // Traiter chaque type de transaction
+      if (typesToFetch.borrows && data.borrows) {
+        const filteredBorrows = (data.borrows || []).filter(tx =>
+          validSymbols.includes(tx.reserve?.symbol)
+        );
+        allTransactions.borrows.push(...filteredBorrows);
+        
+        // Si on a reçu moins que la limite, on a atteint la fin
+        if (data.borrows.length < LIMIT) {
+          limitReached.borrows = true;
+        } else {
+          skip.borrows += LIMIT;
+        }
+      }
 
-      allTransactions.supplies.push(...(data.supplies || []).filter(tx =>
-        validSymbols.includes(tx.reserve?.symbol)
-      ));
+      if (typesToFetch.supplies && data.supplies) {
+        const filteredSupplies = (data.supplies || []).filter(tx =>
+          validSymbols.includes(tx.reserve?.symbol)
+        );
+        allTransactions.supplies.push(...filteredSupplies);
+        
+        if (data.supplies.length < LIMIT) {
+          limitReached.supplies = true;
+        } else {
+          skip.supplies += LIMIT;
+        }
+      }
 
-      allTransactions.withdraws.push(...(data.withdraws || []).filter(tx =>
-        validSymbols.includes(tx.reserve?.symbol)
-      ));
+      if (typesToFetch.withdraws && data.withdraws) {
+        const filteredWithdraws = (data.withdraws || []).filter(tx =>
+          validSymbols.includes(tx.reserve?.symbol)
+        );
+        allTransactions.withdraws.push(...filteredWithdraws);
+        
+        if (data.withdraws.length < LIMIT) {
+          limitReached.withdraws = true;
+        } else {
+          skip.withdraws += LIMIT;
+        }
+      }
 
-      allTransactions.repays.push(...(data.repays || []).filter(tx =>
-        validSymbols.includes(tx.reserve?.symbol)
-      ));
+      if (typesToFetch.repays && data.repays) {
+        const filteredRepays = (data.repays || []).filter(tx =>
+          validSymbols.includes(tx.reserve?.symbol)
+        );
+        allTransactions.repays.push(...filteredRepays);
+        
+        if (data.repays.length < LIMIT) {
+          limitReached.repays = true;
+        } else {
+          skip.repays += LIMIT;
+        }
+      }
 
-
-   
-      // Vérifier s'il y a plus de données
-      const totalInBatch = (data.borrows?.length || 0) + (data.supplies?.length || 0) + (data.withdraws?.length || 0) + (data.repays?.length || 0);
-      if (totalInBatch < LIMIT * 4) {
-        hasMore = false;
-      } else {
-        skip += LIMIT;
-        console.log(`⏭️  Pagination suivante1: skip=${skip}`);
+      // Logs détaillés uniquement en mode debug
+      if (debug) {
+        const activeTypes = Object.entries(typesToFetch)
+          .filter(([_, active]) => active)
+          .map(([type, _]) => type)
+          .join(', ');
+        
+        console.log(`\n📦 Batch #${batchNumber} (types: ${activeTypes}):`);
+        if (typesToFetch.borrows) {
+          console.log(`   borrows: ${data.borrows?.length || 0} → total: ${allTransactions.borrows.length} ${limitReached.borrows ? '(terminé)' : ''}`);
+        }
+        if (typesToFetch.supplies) {
+          console.log(`   supplies: ${data.supplies?.length || 0} → total: ${allTransactions.supplies.length} ${limitReached.supplies ? '(terminé)' : ''}`);
+        }
+        if (typesToFetch.withdraws) {
+          console.log(`   withdraws: ${data.withdraws?.length || 0} → total: ${allTransactions.withdraws.length} ${limitReached.withdraws ? '(terminé)' : ''}`);
+        }
+        if (typesToFetch.repays) {
+          console.log(`   repays: ${data.repays?.length || 0} → total: ${allTransactions.repays.length} ${limitReached.repays ? '(terminé)' : ''}`);
+        }
       }
     }
 
     const totalTransactions = allTransactions.borrows.length + allTransactions.supplies.length +
       allTransactions.withdraws.length + allTransactions.repays.length;
+
+    // Logs finaux récapitulatifs uniquement en mode debug
+    if (debug) {
+      console.log(`\n✅ Récupération terminée !`);
+      console.log(`📊 Résumé final:`);
+      console.log(`   borrows: ${allTransactions.borrows.length}`);
+      console.log(`   supplies: ${allTransactions.supplies.length}`);
+      console.log(`   withdraws: ${allTransactions.withdraws.length}`);
+      console.log(`   repays: ${allTransactions.repays.length}`);
+      console.log(`   TOTAL: ${totalTransactions} transactions\n`);
+    }
 
     return allTransactions;
 
@@ -284,4 +411,5 @@ function transformTransactionsV3ToFrontendFormat(transactions, gnosisTransaction
 module.exports = {
   fetchAllTransactionsV3,
   transformTransactionsV3ToFrontendFormat,
+  extractTxHashFromId
 };

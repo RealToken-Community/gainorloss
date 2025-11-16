@@ -159,113 +159,177 @@ async function fetchTokenTransactionsByVersion(
 }
 
 /**
- * Récupère et post-traite les transactions de supply tokens via GnosisScan
+ * Récupère les transactions de supply tokens depuis l'API GnosisScan
  * @param {string} userAddress - Adresse de l'utilisateur
- * @param {Array} existingTransactions - Transactions déjà connues (pour éviter les doublons)
  * @param {string} version - Version du protocole ('V2' ou 'V3')
  * @param {Object} req - Objet request pour le logging (optionnel)
+ * @returns {Promise<Object>} - Transactions brutes par token
+ */
+async function fetchSupplyTokenTransactionsFromAPI(userAddress, version = 'V3', req = null) {
+  // ADRESSES DES SUPPLY TOKENS SELON LA VERSION
+  const supplyTokenAddresses = {
+    'V3': {
+      'USDC': TOKENS.USDC.supplyAddress, // armmUSDC
+      'WXDAI': TOKENS.WXDAI.supplyAddress  // armmWXDAI
+    },
+    'V2': {
+      'WXDAI': TOKENS.WXDAI.supplyV2Address  // rmmV2WXDAI
+    }
+  };
+  
+  const tokensToFetch = supplyTokenAddresses[version] || supplyTokenAddresses['V3'];
+  const allRawTransactions = {};
+  
+  // RÉCUPÉRER LES TRANSACTIONS POUR CHAQUE TOKEN
+  for (const [tokenSymbol, contractAddress] of Object.entries(tokensToFetch)) {
+    try {
+      const rawTransactions = await fetchAllTokenTransactions(
+        userAddress,
+        contractAddress,
+        version === 'V2' ? 1 : 32074665, // V2: bloc 1, V3: bloc 32074665
+        99999999,
+        req
+      );
+      
+      allRawTransactions[tokenSymbol] = rawTransactions;
+      
+    } catch (error) {
+      console.error(`❌ Erreur lors de la récupération des transactions ${tokenSymbol}:`, error);
+      allRawTransactions[tokenSymbol] = [];
+    }
+    
+    // RESPECTER LA LIMITE D'API ENTRE LES TOKENS
+    if (Object.keys(tokensToFetch).length > 1) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  
+  return allRawTransactions;
+}
+
+/**
+ * Nettoie et filtre les transactions brutes
+ * @param {Array} rawTransactions - Transactions brutes depuis l'API
+ * @param {string} userAddress - Adresse de l'utilisateur
+ * @param {Object} existingTransactions - Transactions déjà connues (pour éviter les doublons)
+ * @param {string} hashToFilter - Hash optionnel pour filtrer une transaction spécifique (avant les autres filtres)
+ * @returns {Array} - Transactions filtrées
+ */
+function cleanAndFilterTransactions(rawTransactions, userAddress, existingTransactions = {}, hashToFilter = null) {
+  return rawTransactions.filter(tx => {
+    // FILTRAGE PAR HASH (si spécifié) - AVANT les autres filtres
+    if (hashToFilter) {
+      if (tx.hash.toLowerCase() !== hashToFilter.toLowerCase()) {
+        return false;
+      }
+    }
+    
+    // ❌ ÉLIMINER LES MINT/BURN (from ou to = 0x0000...)
+    if ((tx.from === '0x0000000000000000000000000000000000000000' || 
+        tx.to === '0x0000000000000000000000000000000000000000') 
+        && (tx.functionName !== 'supply(address asset,uint256 amount,address onBehalfOf,uint16 referralCode)' )) {
+      return false;
+    }
+    
+    // VÉRIFIER SI LA TRANSACTION EXISTE DÉJÀ DANS THEGRAPH
+    const isAlreadyKnown = existingTransactions.supplies?.some(existingTx => 
+      existingTx.hash === tx.hash
+    ) || existingTransactions.withdraws?.some(existingTx => 
+      existingTx.hash === tx.hash
+    );
+    
+    if (isAlreadyKnown) {
+      return false;
+    }
+    
+    return true;
+  });
+}
+
+/**
+ * Détermine le type de transaction selon la direction
+ * @param {Object} tx - Transaction brute
+ * @param {string} userAddress - Adresse de l'utilisateur
+ * @returns {string} - Type de transaction ('in_others', 'out_others', 'ronday', 'unknown')
+ */
+function determineTransactionType(tx, userAddress) {
+  if (tx.to.toLowerCase() === userAddress.toLowerCase()) {
+    // VÉRIFIER SI C'EST UNE FONCTION DISPERSETOKEN
+    if (tx.functionName && tx.functionName.includes('disperseToken(address token, address[] recipients, uint256[] values)')) {
+      return 'ronday'; // L'utilisateur reçoit des tokens via Ronday
+    } else {
+      return 'in_others'; // L'utilisateur reçoit des tokens (cas par défaut)
+    }
+  } else if (tx.from.toLowerCase() === userAddress.toLowerCase()) {
+    return 'out_others'; // L'utilisateur envoie des tokens
+  } else {
+    return 'unknown'; // Cas par défaut (ne devrait pas arriver après filtrage)
+  }
+}
+
+/**
+ * Formate les transactions filtrées en format final
+ * @param {Array} filteredTransactions - Transactions filtrées
+ * @param {string} tokenSymbol - Symbole du token
+ * @param {string} version - Version du protocole
+ * @param {string} userAddress - Adresse de l'utilisateur
+ * @returns {Array} - Transactions formatées
+ */
+function formatTransactions(filteredTransactions, tokenSymbol, version, userAddress) {
+  return filteredTransactions.map(tx => {
+    const type = determineTransactionType(tx, userAddress);
+    
+    return {
+      txHash: tx.hash,
+      amount: tx.value,
+      timestamp: parseInt(tx.timeStamp),
+      type: type,
+      token: tokenSymbol,
+      version: version
+    };
+  });
+}
+
+/**
+ * Récupère et post-traite les transactions de supply tokens via GnosisScan
+ * @param {string} userAddress - Adresse de l'utilisateur
+ * @param {Object} existingTransactions - Transactions déjà connues (pour éviter les doublons)
+ * @param {string} version - Version du protocole ('V2' ou 'V3')
+ * @param {Object} req - Objet request pour le logging (optionnel)
+ * @param {string} hashToFilter - Hash optionnel pour filtrer une transaction spécifique (avant les autres filtres)
  * @returns {Promise<Object>} - Transactions formatées par token
  */
 async function fetchSupplyTokenTransactionsViaGnosisScan(
   userAddress, 
-  existingTransactions = [], 
+  existingTransactions = {}, 
   version = 'V3', 
-  req = null
+  req = null,
+  hashToFilter = null
 ) {
   
   try {
-
-    // ADRESSES DES SUPPLY TOKENS SELON LA VERSION
-    const supplyTokenAddresses = {
-      'V3': {
-        'USDC': TOKENS.USDC.supplyAddress, // armmUSDC
-        'WXDAI': TOKENS.WXDAI.supplyAddress  // armmWXDAI
-      },
-      'V2': {
-        'WXDAI': TOKENS.WXDAI.supplyV2Address  // rmmV2WXDAI
-      }
-    };
+    // 1. Récupération des données depuis l'API GnosisScan
+    const allRawTransactions = await fetchSupplyTokenTransactionsFromAPI(userAddress, version, req);
     
-    const tokensToFetch = supplyTokenAddresses[version] || supplyTokenAddresses['V3'];
-    const allRawTransactions = {};
+    // 2. Nettoyage, filtrage et formatage pour chaque token
     const allFormattedTransactions = {};
     
-    // RÉCUPÉRER LES TRANSACTIONS POUR CHAQUE TOKEN
-    for (const [tokenSymbol, contractAddress] of Object.entries(tokensToFetch)) {
-
-
-      try {
-        const rawTransactions = await fetchAllTokenTransactions(
-          userAddress,
-          contractAddress,
-          version === 'V2' ? 1 : 32074665, // V2: bloc 1, V3: bloc 32074665
-          99999999,
-          req
-        );
-        
-        allRawTransactions[tokenSymbol] = rawTransactions;
-        
-      } catch (error) {
-        console.error(`❌ Erreur lors de la récupération des transactions ${tokenSymbol}:`, error);
-        allRawTransactions[tokenSymbol] = [];
-      }
-      
-      // RESPECTER LA LIMITE D'API ENTRE LES TOKENS
-      if (Object.keys(tokensToFetch).length > 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
     for (const [tokenSymbol, rawTransactions] of Object.entries(allRawTransactions)) {
-
-
-      const filteredTransactions = rawTransactions
-        .filter(tx => {
-          // ❌ ÉLIMINER LES MINT/BURN (from ou to = 0x0000...)
-          if (tx.from === '0x0000000000000000000000000000000000000000' || 
-              tx.to === '0x0000000000000000000000000000000000000000') {
-            return false;
-          }
-          
-          // VÉRIFIER SI LA TRANSACTION EXISTE DÉJÀ DANS THEGRAPH
-          const isAlreadyKnown = existingTransactions.supplies.some(existingTx => 
-            existingTx.hash === tx.hash
-          ) || existingTransactions.withdraws.some(existingTx => 
-            existingTx.hash === tx.hash
-          );
-          
-          if (isAlreadyKnown) {
-            return false;
-          }
-          
-          return true;
-        })
-        .map(tx => {
-          // DÉTERMINER LE TYPE SELON LA DIRECTION
-          let type;
-          if (tx.to.toLowerCase() === userAddress.toLowerCase()) {
-            // VÉRIFIER SI C'EST UNE FONCTION DISPERSETOKEN
-            if (tx.functionName && tx.functionName.includes('disperseToken(address token, address[] recipients, uint256[] values)')) {
-              type = 'ronday'; // L'utilisateur reçoit des tokens via Ronday
-            } else {
-              type = 'in_others'; // L'utilisateur reçoit des tokens (cas par défaut)
-            }
-          } else if (tx.from.toLowerCase() === userAddress.toLowerCase()) {
-            type = 'out_others'; // L'utilisateur envoie des tokens
-          } else {
-            type = 'unknown'; // Cas par défaut (ne devrait pas arriver après filtrage)
-          }
-          
-          return {
-            txHash: tx.hash,
-            amount: tx.value,
-            timestamp: parseInt(tx.timeStamp),
-            type: type,
-            token: tokenSymbol,
-            version: version
-          };
-        });
-      allFormattedTransactions[tokenSymbol] = filteredTransactions;
+      // Nettoyage et filtrage
+      const filteredTransactions = cleanAndFilterTransactions(
+        rawTransactions,
+        userAddress,
+        existingTransactions,
+        hashToFilter
+      );
+      
+      // Formatage
+      allFormattedTransactions[tokenSymbol] = formatTransactions(
+        filteredTransactions,
+        tokenSymbol,
+        version,
+        userAddress
+      );
     }
     
     return allFormattedTransactions;

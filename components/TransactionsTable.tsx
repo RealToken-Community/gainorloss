@@ -31,6 +31,9 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
   // Sélection multiple des types de transactions (local)
   // Si le Set contient 'all', alors tous les types sont sélectionnés
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set(['all']));
+  
+  // État pour la recherche de hash
+  const [hashSearch, setHashSearch] = useState<string>('');
 
   // Filtrer les transactions
   const filteredTransactions = useMemo(() => {
@@ -70,9 +73,13 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
       const txTimestamp = tx.timestamp; // Déjà en Unix timestamp
       const dateMatch = txTimestamp >= startTimestamp && txTimestamp <= endTimestamp;
       
-      return tokenMatch && typeMatch && dateMatch;
+      // Filtre par hash (recherche par préfixe)
+      const hashMatch = !hashSearch || !tx.txHash || 
+        tx.txHash.toLowerCase().startsWith(hashSearch.toLowerCase());
+      
+      return tokenMatch && typeMatch && dateMatch && hashMatch;
     });
-  }, [transactions, selectedTokens, selectedTypes, dateRangeProp.start, dateRangeProp.end]);
+  }, [transactions, selectedTokens, selectedTypes, dateRangeProp.start, dateRangeProp.end, hashSearch]);
 
   // Gérer la sélection/désélection d'un type
   const handleTypeToggle = (type: string) => {
@@ -209,7 +216,9 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
               <span>Repay: {filteredTransactions.filter(tx => tx.type === 'repay').length}</span>
               <span>Deposit: {filteredTransactions.filter(tx => tx.type === 'deposit').length}</span>
               <span>Withdraw: {filteredTransactions.filter(tx => tx.type === 'withdraw').length}</span>
-              <span>Period: {formatDateForInput(dateRangeProp.start)} - {formatDateForInput(dateRangeProp.end)}</span>
+              {hashSearch && (
+                <span>Hash: {hashSearch}</span>
+              )}
             </div>
           )}
 
@@ -250,6 +259,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   <button
                     onClick={() => {
                       setSelectedTypes(new Set(['all']));
+                      setHashSearch('');
                     }}
                     className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
                   >
@@ -303,12 +313,21 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
               </p>
             </div>
             
-            {/* Colonne 6: Période */}
+            {/* Colonne 6: Recherche de hash */}
             <div className="bg-gray-50 border border-gray-100 p-3 sm:p-4 rounded-xl col-span-2 sm:col-span-1">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-700 mb-1">Period</h3>
-              <p className="text-xs sm:text-sm font-bold text-gray-600">
-                {formatDateForInput(dateRangeProp.start)} - {formatDateForInput(dateRangeProp.end)}
-              </p>
+              <h3 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Search Hash</h3>
+              <input
+                type="text"
+                value={hashSearch}
+                onChange={(e) => setHashSearch(e.target.value)}
+                placeholder="0x123..."
+                className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+              />
+              {hashSearch && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {filteredTransactions.length} match{filteredTransactions.length !== 1 ? 'es' : ''}
+                </p>
+              )}
             </div>
           </div>
 
