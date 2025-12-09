@@ -21,6 +21,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Passer les variables NEXT_PUBLIC_* au build (intégrées dans le code compilé)
+ARG NEXT_PUBLIC_BACKEND_URL
+ARG NEXT_PUBLIC_FRONTEND_URL
+ARG NEXT_PUBLIC_GNOSISSCAN_API_KEY
+ARG NEXT_PUBLIC_THEGRAPH_API_URL
+ARG NEXT_PUBLIC_GNOSIS_RPC_URL
+
+# Définir les variables d'environnement pour le build
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+ENV NEXT_PUBLIC_FRONTEND_URL=$NEXT_PUBLIC_FRONTEND_URL
+ENV NEXT_PUBLIC_GNOSISSCAN_API_KEY=$NEXT_PUBLIC_GNOSISSCAN_API_KEY
+ENV NEXT_PUBLIC_THEGRAPH_API_URL=$NEXT_PUBLIC_THEGRAPH_API_URL
+ENV NEXT_PUBLIC_GNOSIS_RPC_URL=$NEXT_PUBLIC_GNOSIS_RPC_URL
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.

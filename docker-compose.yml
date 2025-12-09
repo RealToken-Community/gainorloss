@@ -8,9 +8,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      NEXT_PUBLIC_THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
-      NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
-      NEXT_PUBLIC_GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL:-https://rpc.gnosischain.com/}
+      # Utiliser THEGRAPH_API_KEY (sans NEXT_PUBLIC_) pour que ce soit côté serveur uniquement
+      THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
+      GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+      GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL:-https://rpc.gnosischain.com/}
       CORS_ORIGIN: https://gainorloss.battistu.com
 
     expose:
@@ -43,14 +44,21 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BUILD_ENV: production
+        # Passer les variables NEXT_PUBLIC_* au build (intégrées dans le code compilé)
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+        NEXT_PUBLIC_FRONTEND_URL: ${NEXT_PUBLIC_FRONTEND_URL}
+        NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+        NEXT_PUBLIC_THEGRAPH_API_URL: ${NEXT_PUBLIC_THEGRAPH_API_URL}
+        NEXT_PUBLIC_GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL}
     container_name: gainorloss-frontend
 
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
-      NEXT_PUBLIC_BACKEND_URL: https://api-gainorloss.battistu.com #TODO change it on realtoken.com
+      # Ces variables ne sont plus nécessaires au runtime car intégrées au build
+      # mais on peut les garder pour compatibilité
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
       NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
       NEXT_PUBLIC_THEGRAPH_API_URL: ${NEXT_PUBLIC_THEGRAPH_API_URL}
 
@@ -85,4 +93,3 @@ networks:
 
   internal:
     driver: bridge
-

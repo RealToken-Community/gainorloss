@@ -24,8 +24,14 @@ async function getClient() {
  */
 function buildTransactionsQueryV3(typesToFetch) {
   const queryParts = [];
+  const variables = [];
+  
+  // Toujours déclarer les variables communes
+  variables.push('$userAddress: String!');
+  variables.push('$first: Int!');
   
   if (typesToFetch.borrows) {
+    variables.push('$skipBorrows: Int!');
     queryParts.push(`
     borrows: borrows(
       first: $first
@@ -46,6 +52,7 @@ function buildTransactionsQueryV3(typesToFetch) {
   }
   
   if (typesToFetch.supplies) {
+    variables.push('$skipSupplies: Int!');
     queryParts.push(`
     supplies: supplies(
       first: $first
@@ -66,6 +73,7 @@ function buildTransactionsQueryV3(typesToFetch) {
   }
   
   if (typesToFetch.withdraws) {
+    variables.push('$skipWithdraws: Int!');
     queryParts.push(`
     withdraws: redeemUnderlyings(
       first: $first
@@ -86,6 +94,7 @@ function buildTransactionsQueryV3(typesToFetch) {
   }
   
   if (typesToFetch.repays) {
+    variables.push('$skipRepays: Int!');
     queryParts.push(`
     repays: repays(
       first: $first
@@ -105,18 +114,19 @@ function buildTransactionsQueryV3(typesToFetch) {
     }`);
   }
   
-  return `
-  query GetTransactionsV3(
-    $userAddress: String!
-    $first: Int!
-    $skipBorrows: Int!
-    $skipSupplies: Int!
-    $skipWithdraws: Int!
-    $skipRepays: Int!
-  ) {
-    ${queryParts.join('\n')}
+  // Vérifier qu'au moins un type est demandé
+  if (queryParts.length === 0) {
+    throw new Error('Aucun type de transaction à récupérer');
   }
-`;
+  
+  // Construire la requête sans lignes vides inutiles
+  const queryString = `query GetTransactionsV3(
+    ${variables.join('\n    ')}
+  ) {
+${queryParts.join('')}
+  }`;
+  
+  return queryString;
 }
 
 /**
@@ -171,18 +181,44 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       // Générer la requête dynamiquement
       const query = buildTransactionsQueryV3(typesToFetch);
       
-      // Préparer les variables pour la requête
+      // Préparer les variables pour la requête (seulement celles nécessaires)
       const variables = {
         userAddress: userAddress.toLowerCase(),
-        first: LIMIT,
-        skipBorrows: skip.borrows,
-        skipSupplies: skip.supplies,
-        skipWithdraws: skip.withdraws,
-        skipRepays: skip.repays
+        first: LIMIT
       };
+      
+      // Ajouter seulement les variables skip pour les types demandés
+      if (typesToFetch.borrows) {
+        variables.skipBorrows = skip.borrows;
+      }
+      if (typesToFetch.supplies) {
+        variables.skipSupplies = skip.supplies;
+      }
+      if (typesToFetch.withdraws) {
+        variables.skipWithdraws = skip.withdraws;
+      }
+      if (typesToFetch.repays) {
+        variables.skipRepays = skip.repays;
+      }
+
+      if (debug) {
+        console.log(`📤 Requête GraphQL (batch ${batchNumber}):`);
+        console.log(query);
+        console.log(`📦 Variables:`, JSON.stringify(variables, null, 2));
+      }
 
       const graphqlClient = await getClient();
-      const data = await graphqlClient.request(query, variables);
+      let data;
+      try {
+        data = await graphqlClient.request(query, variables);
+      } catch (error) {
+        if (debug) {
+          console.error(`❌ Erreur GraphQL détaillée:`, error);
+          console.error(`🔍 Requête envoyée:`, query);
+          console.error(`🔍 Variables envoyées:`, JSON.stringify(variables, null, 2));
+        }
+        throw error;
+      }
 
       const validSymbols = ['USDC', 'WXDAI'];
 
