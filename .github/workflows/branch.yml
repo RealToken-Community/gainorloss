@@ -1,0 +1,124 @@
+name: Test and deploy to branch
+
+on:
+  push:
+    branches:
+      - master
+      - preprod
+      - develop
+
+jobs:
+  validate:
+    name: Validate branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    name: Deploy to branch
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_LOGIN }}
+          password: ${{ secrets.DOCKER_PASSWD }}
+
+      - name: Build and push frontend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}
+          build-args: |
+            NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+            NEXT_PUBLIC_FRONTEND_URL=${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
+            NEXT_PUBLIC_GNOSISSCAN_API_KEY=${{ secrets.NEXT_PUBLIC_GNOSISSCAN_API_KEY }}
+            NEXT_PUBLIC_THEGRAPH_API_URL=${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
+            NEXT_PUBLIC_GNOSIS_RPC_URL=${{ secrets.NEXT_PUBLIC_GNOSIS_RPC_URL }}
+
+      - name: Build and push backend Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain-backend:${{ github.ref_name }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/staging.key
+          chmod 600 ~/.ssh/staging.key
+          cat >>~/.ssh/config <<END
+          Host staging
+            HostName $SSH_HOST
+            User $SSH_USER
+            Port $SSH_PORT
+            IdentityFile ~/.ssh/staging.key
+            StrictHostKeyChecking no
+          END
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+
+      - name: Update branch environment
+        env:
+          DOCKER_BRANCH: ${{ github.ref_name }}
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+          DOCKER_LOGIN: ${{ secrets.DOCKER_LOGIN }}
+          DOCKER_PASSWD: ${{ secrets.DOCKER_PASSWD }}
+          DOMAIN_URL: ${{ secrets.DOMAIN_URL }}
+          NEXT_PUBLIC_THEGRAPH_API_KEY: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_KEY }}
+          NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${{ secrets.NEXT_PUBLIC_GNOSISSCAN_API_KEY }}
+          NEXT_PUBLIC_GNOSIS_RPC_URL: ${{ secrets.NEXT_PUBLIC_GNOSIS_RPC_URL }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+          NEXT_PUBLIC_FRONTEND_URL: ${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
+          NEXT_PUBLIC_THEGRAPH_API_URL: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
+        run: |
+          if [[ "$DOCKER_BRANCH" == "master" ]]; then
+            export HOSTNAME="analytics.rmm.$DOMAIN_URL"
+          elif [[ "$DOCKER_BRANCH" == "preprod" ]]; then
+            export HOSTNAME="analytics.rmm.$DOCKER_BRANCH.$DOMAIN_URL"
+          else
+            export HOSTNAME="analytics.rmm.$DOCKER_BRANCH.$DOMAIN_URL"
+          fi
+      
+          ssh staging <<EOF
+            set -euxo pipefail
+            export DOCKER_BRANCH="$DOCKER_BRANCH"
+            export DOCKER_REGISTRY="$DOCKER_REGISTRY"
+      
+            cd /var/docker/gainorloss/\$DOCKER_BRANCH
+            git pull origin \$DOCKER_BRANCH
+            docker compose --file docker-compose-branch.yml pull
+            docker login -u "$DOCKER_LOGIN" -p "$DOCKER_PASSWD" \$DOCKER_REGISTRY
+      
+            NEXT_PUBLIC_THEGRAPH_API_KEY="$NEXT_PUBLIC_THEGRAPH_API_KEY" \
+            NEXT_PUBLIC_GNOSISSCAN_API_KEY="$NEXT_PUBLIC_GNOSISSCAN_API_KEY" \
+            NEXT_PUBLIC_GNOSIS_RPC_URL="$NEXT_PUBLIC_GNOSIS_RPC_URL" \
+            NEXT_PUBLIC_BACKEND_URL="$NEXT_PUBLIC_BACKEND_URL" \
+            NEXT_PUBLIC_FRONTEND_URL="$NEXT_PUBLIC_FRONTEND_URL" \
+            NEXT_PUBLIC_THEGRAPH_API_URL="$NEXT_PUBLIC_THEGRAPH_API_URL" \
+            HOSTNAME="$HOSTNAME" \
+            docker compose --project-name \$DOCKER_BRANCH-rmmgain --file docker-compose-branch.yml up -d
+          EOF
+
