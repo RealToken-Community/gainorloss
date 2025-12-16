@@ -93,7 +93,7 @@ jobs:
           NEXT_PUBLIC_FRONTEND_URL: ${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
           NEXT_PUBLIC_THEGRAPH_API_URL: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
         run: |
-          if [[ "$DOCKER_BRANCH" == "master" ]]; then
+          if [[ "$DOCKER_BRANCH" == "main" ]]; then
             export HOSTNAME="analytics.rmm.$DOMAIN_URL"
           elif [[ "$DOCKER_BRANCH" == "preprod" ]]; then
             export HOSTNAME="analytics.rmm.$DOCKER_BRANCH.$DOMAIN_URL"
