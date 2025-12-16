@@ -5,8 +5,8 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# Install yarn globally
-RUN corepack enable && corepack prepare yarn@stable --activate
+# Disable corepack and install yarn classic (1.x) globally
+RUN corepack disable && npm install -g --force yarn@1.22.22
 
 # Install dependencies based on the preferred package manager
 COPY package.json yarn.lock* package-lock.json* ./
@@ -22,8 +22,8 @@ RUN \
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Install yarn globally
-RUN corepack enable && corepack prepare yarn@stable --activate
+# Disable corepack and install yarn classic (1.x) globally
+RUN corepack disable && npm install -g --force yarn@1.22.22
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
