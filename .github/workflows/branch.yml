@@ -3,9 +3,8 @@ name: Test and deploy to branch
 on:
   push:
     branches:
-      - master
+      - main
       - preprod
-      - develop
 
 jobs:
   validate:
