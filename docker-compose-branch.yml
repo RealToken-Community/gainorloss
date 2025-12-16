@@ -9,7 +9,7 @@ services:
       - NEXT_PUBLIC_THEGRAPH_API_URL=${NEXT_PUBLIC_THEGRAPH_API_URL}
     networks:
       - traefik-realt
-      - rmmgain-network
+      - rmmgain
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.rule=Host(`${HOSTNAME}`)'
@@ -30,12 +30,10 @@ services:
       - NEXT_PUBLIC_GNOSIS_RPC_URL=${NEXT_PUBLIC_GNOSIS_RPC_URL:-https://rpc.gnosischain.com/}
       - CORS_ORIGIN=https://${HOSTNAME}
     networks:
-      - rmmgain-network
+      - rmmgain
     restart: always
 
 networks:
   traefik-realt:
     external: true
-  rmmgain-network:
-    driver: bridge
-
+  rmmgain:
