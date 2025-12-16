@@ -4,9 +4,10 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Install dependencies
-COPY backend/package.json backend/package-lock.json* ./
+COPY backend/package.json backend/yarn.lock* backend/package-lock.json* ./
 RUN \
-  if [ -f package-lock.json ]; then npm ci; \
+  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
