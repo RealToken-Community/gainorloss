@@ -720,7 +720,7 @@ export default function Home() {
                     <div className="text-center py-12">
                       <div className="text-6xl mb-4">😢</div>
                       <p className="text-lg text-gray-600">
-                        This wallet is too young and has never known the V2 :'(
+                        This wallet is too young and has never known the V2 :&apos;(
                       </p>
                     </div>
                   ) : (
