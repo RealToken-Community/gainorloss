@@ -6,10 +6,11 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
+COPY package.json yarn.lock* package-lock.json* ./
 RUN apk add --no-cache git openssh
 RUN \
-  if [ -f package-lock.json ]; then npm ci; \
+  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
   else echo "Lockfile not found." && exit 1; \
   fi
 
@@ -39,7 +40,7 @@ ENV NEXT_PUBLIC_GNOSIS_RPC_URL=$NEXT_PUBLIC_GNOSIS_RPC_URL
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN yarn build
 
 # Ensure public directory exists (create if it doesn't and add a placeholder file)
 RUN mkdir -p ./public && touch ./public/.gitkeep || true
