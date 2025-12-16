@@ -1,7 +1,7 @@
 services:
   frontend:
-    image: ${DOCKER_REGISTRY}/rmmgain:${DOCKER_BRANCH}
-    container_name: ${DOCKER_BRANCH}-rmmgain
+    image: ${DOCKER_REGISTRY}/rmmgain:${DOCKER_BRANCH}-frontend
+    container_name: ${DOCKER_BRANCH}-rmmgain-frontend
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BACKEND_URL=http://backend:5000
@@ -20,7 +20,7 @@ services:
     restart: always
 
   backend:
-    image: ${DOCKER_REGISTRY}/rmmgain-backend:${DOCKER_BRANCH}
+    image: ${DOCKER_REGISTRY}/rmmgain:${DOCKER_BRANCH}-backend
     container_name: ${DOCKER_BRANCH}-rmmgain-backend
     environment:
       - NODE_ENV=production

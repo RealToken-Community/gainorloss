@@ -44,7 +44,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}
+          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}-frontend
           build-args: |
             NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
             NEXT_PUBLIC_FRONTEND_URL=${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
@@ -58,7 +58,7 @@ jobs:
           context: .
           file: ./backend/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain-backend:${{ github.ref_name }}
+          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}-backend
 
       - name: Configure SSH
         run: |
