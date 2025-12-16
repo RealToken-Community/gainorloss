@@ -14,7 +14,6 @@ services:
       - 'traefik.enable=true'
       - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.rule=Host(`${HOSTNAME}`)'
       - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.entrypoints=websecure'
-      - 'traefik.http.routers.rmmgain-${DOCKER_BRANCH}.tls.certresolver=letsencrypt'
       - 'traefik.http.services.rmmgain-${DOCKER_BRANCH}.loadbalancer.server.port=3000'
     depends_on:
       - backend
