@@ -5,6 +5,9 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
+# Install yarn globally
+RUN corepack enable && corepack prepare yarn@stable --activate
+
 # Install dependencies based on the preferred package manager
 COPY package.json yarn.lock* package-lock.json* ./
 RUN apk add --no-cache git openssh
@@ -18,6 +21,10 @@ RUN \
 # 2. Rebuild the source code only when needed
 FROM node:18-alpine AS builder
 WORKDIR /app
+
+# Install yarn globally
+RUN corepack enable && corepack prepare yarn@stable --activate
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
