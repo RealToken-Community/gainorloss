@@ -15,7 +15,7 @@ app.use(helmet());
 // Configuration CORS
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.CORS_ORIGIN || 'https://gainorloss.mybots.fun'
+  process.env.CORS_ORIGIN || 'https://analytics.rmm.realtoken.community/'
 ].filter(Boolean); // Supprime les valeurs undefined
 console.log('�� CORS Origins autorisés:', allowedOrigins);
 
