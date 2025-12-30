@@ -472,8 +472,8 @@ export default function Home() {
     setData(null);
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-      const apiUrl = `${backendUrl}/api/rmm/v3/${address.trim()}`;
+      // Utiliser les routes API internes Next.js
+      const apiUrl = `/api/rmm/v3/${address.trim()}`;
       console.log('🚀 Appel API vers:', apiUrl);
       
       const response = await fetch(apiUrl);
@@ -490,7 +490,7 @@ export default function Home() {
       // Récupérer les données RMM v2
       console.log('🔄 Récupération des données RMM v2...');
       try {
-        const v2Response = await fetch(`${backendUrl}/api/rmm/v2/${address.trim()}`);
+        const v2Response = await fetch(`/api/rmm/v2/${address.trim()}`);
         if (v2Response.ok) {
           const v2Result = await v2Response.json();
           console.log('✅ Données RMM v2 reçues:', v2Result);

@@ -5,16 +5,12 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
-# Disable corepack and install yarn classic (1.x) globally
-RUN corepack disable && npm install -g --force yarn@1.22.22
-
-# Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* ./
+# Install dependencies using NPM
+COPY package.json package-lock.json* ./
 RUN apk add --no-cache git openssh
 RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  else echo "Lockfile not found." && exit 1; \
+  if [ -f package-lock.json ]; then npm ci; \
+  else echo "package-lock.json not found." && exit 1; \
   fi
 
 
@@ -22,23 +18,18 @@ RUN \
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Disable corepack and install yarn classic (1.x) globally
-RUN corepack disable && npm install -g --force yarn@1.22.22
-
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Passer les variables NEXT_PUBLIC_* au build (intégrées dans le code compilé)
-ARG NEXT_PUBLIC_BACKEND_URL
-ARG NEXT_PUBLIC_FRONTEND_URL
 ARG NEXT_PUBLIC_GNOSISSCAN_API_KEY
+ARG NEXT_PUBLIC_THEGRAPH_API_KEY
 ARG NEXT_PUBLIC_THEGRAPH_API_URL
 ARG NEXT_PUBLIC_GNOSIS_RPC_URL
 
 # Définir les variables d'environnement pour le build
-ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
-ENV NEXT_PUBLIC_FRONTEND_URL=$NEXT_PUBLIC_FRONTEND_URL
 ENV NEXT_PUBLIC_GNOSISSCAN_API_KEY=$NEXT_PUBLIC_GNOSISSCAN_API_KEY
+ENV NEXT_PUBLIC_THEGRAPH_API_KEY=$NEXT_PUBLIC_THEGRAPH_API_KEY
 ENV NEXT_PUBLIC_THEGRAPH_API_URL=$NEXT_PUBLIC_THEGRAPH_API_URL
 ENV NEXT_PUBLIC_GNOSIS_RPC_URL=$NEXT_PUBLIC_GNOSIS_RPC_URL
 
@@ -47,7 +38,7 @@ ENV NEXT_PUBLIC_GNOSIS_RPC_URL=$NEXT_PUBLIC_GNOSIS_RPC_URL
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN yarn build
+RUN npm run build
 
 # Ensure public directory exists (create if it doesn't and add a placeholder file)
 RUN mkdir -p ./public && touch ./public/.gitkeep || true
