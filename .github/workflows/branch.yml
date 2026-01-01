@@ -46,19 +46,10 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}-frontend
           build-args: |
-            NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
             NEXT_PUBLIC_FRONTEND_URL=${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
             NEXT_PUBLIC_GNOSISSCAN_API_KEY=${{ secrets.NEXT_PUBLIC_GNOSISSCAN_API_KEY }}
             NEXT_PUBLIC_THEGRAPH_API_URL=${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
             NEXT_PUBLIC_GNOSIS_RPC_URL=${{ secrets.NEXT_PUBLIC_GNOSIS_RPC_URL }}
-
-      - name: Build and push backend Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}-backend
 
       - name: Configure SSH
         run: |
@@ -89,7 +80,6 @@ jobs:
           NEXT_PUBLIC_THEGRAPH_API_KEY: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_KEY }}
           NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${{ secrets.NEXT_PUBLIC_GNOSISSCAN_API_KEY }}
           NEXT_PUBLIC_GNOSIS_RPC_URL: ${{ secrets.NEXT_PUBLIC_GNOSIS_RPC_URL }}
-          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
           NEXT_PUBLIC_FRONTEND_URL: ${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
           NEXT_PUBLIC_THEGRAPH_API_URL: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
         run: |
@@ -114,7 +104,6 @@ jobs:
             NEXT_PUBLIC_THEGRAPH_API_KEY="$NEXT_PUBLIC_THEGRAPH_API_KEY" \
             NEXT_PUBLIC_GNOSISSCAN_API_KEY="$NEXT_PUBLIC_GNOSISSCAN_API_KEY" \
             NEXT_PUBLIC_GNOSIS_RPC_URL="$NEXT_PUBLIC_GNOSIS_RPC_URL" \
-            NEXT_PUBLIC_BACKEND_URL="$NEXT_PUBLIC_BACKEND_URL" \
             NEXT_PUBLIC_FRONTEND_URL="$NEXT_PUBLIC_FRONTEND_URL" \
             NEXT_PUBLIC_THEGRAPH_API_URL="$NEXT_PUBLIC_THEGRAPH_API_URL" \
             HOSTNAME="$HOSTNAME" \
