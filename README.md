@@ -13,10 +13,14 @@ Before starting, ensure you have the following installed:
 
 ```
 rmmgain/
-├── frontend/          # Next.js React application
-├── backend/           # Express.js API server
-├── components/        # React components
-└── utils/            # Utility functions and constants
+├── pages/            # Next.js pages and API routes
+│   ├── api/          # API routes (Next.js API routes)
+│   └── index.tsx     # Main frontend page
+├── lib/              # Library code
+│   └── services/     # Business logic and API services
+├── components/       # React components
+├── utils/            # Utility functions and constants
+└── types/            # TypeScript type definitions
 ```
 
 ## 🚀 Quick Start
@@ -30,41 +34,20 @@ cd rmmgain
 
 ### Step 2: Install Dependencies
 
-#### Frontend Dependencies
 ```bash
 npm install
-```
-
-#### Backend Dependencies
-```bash
-cd backend
-npm install
-cd ..
 ```
 
 ### Step 3: Environment Configuration
 
-#### Frontend Environment (.env)
 Create a `.env` file in the root directory:
 
 ```bash
-# Frontend Environment Variables
-NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
+# Environment Variables
 NEXT_PUBLIC_GNOSISSCAN_API_KEY=your_gnosisscan_api_key_here
+NEXT_PUBLIC_THEGRAPH_API_KEY=your_thegraph_api_key_here
 NEXT_PUBLIC_THEGRAPH_API_URL=https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg
-```
-
-#### Backend Environment (.env)
-Create a `.env` file in the `backend/` directory:
-
-```bash
-# Backend Environment Variables
-PORT=5000
-NODE_ENV=development
-THEGRAPH_API_KEY=your_thegraph_api_key_here
-GNOSISSCAN_API_KEY=your_gnosisscan_api_key_here
-GNOSIS_RPC_URL=https://rpc.gnosischain.com/
-CORS_ORIGIN=http://localhost:3000
+NEXT_PUBLIC_GNOSIS_RPC_URL=https://rpc.gnosischain.com/
 ```
 
 ### Step 4: API Keys Setup
@@ -74,100 +57,52 @@ CORS_ORIGIN=http://localhost:3000
 2. Create a free account
 3. Navigate to "API-KEYs" in your profile
 4. Create a new API key
-5. Add it to both `.env` files
+5. Add it to your `.env` file as `NEXT_PUBLIC_GNOSISSCAN_API_KEY`
 
 #### TheGraph API Key (Recommended)
 1. Go to [https://thegraph.com/](https://thegraph.com/)
 2. Create an account
 3. Navigate to "API Keys"
 4. Create a new API key
-5. Add it to the backend `.env` file
+5. Add it to your `.env` file as `NEXT_PUBLIC_THEGRAPH_API_KEY`
 
 ## 🎯 Running the Application
 
 ### Development Mode
 
-#### Start Backend Server
 ```bash
-cd backend
 npm run dev
 ```
-The backend will start on `http://localhost:5000`
-
-#### Start Frontend Application
-```bash
-# In a new terminal, from the root directory
-npm run dev
-```
-The frontend will start on `http://localhost:3000`
+The application will start on `http://localhost:3000`
 
 ### Production Mode
 
-#### Build Frontend
 ```bash
 npm run build
 npm start
 ```
-
-#### Start Backend
-```bash
-cd backend
-npm start
-```
+The application will start on `http://localhost:3000`
 
 ## 🛑 Stopping the Application
 
-### Stop Frontend
 ```bash
-# Press Ctrl+C in the frontend terminal
-```
-
-### Stop Backend
-```bash
-# Press Ctrl+C in the backend terminal
+# Press Ctrl+C in the terminal
 ```
 
 ## 🔄 Restarting the Application
 
-### Restart Frontend
 ```bash
 # Stop with Ctrl+C, then restart
-npm run dev
-```
-
-### Restart Backend
-```bash
-cd backend
-# Stop with Ctrl+C, then restart
-npm run dev
-```
-
-### Restart Both
-```bash
-# Stop both processes with Ctrl+C
-# Then restart in separate terminals:
-# Terminal 1:
-cd backend && npm run dev
-
-# Terminal 2:
 npm run dev
 ```
 
 ## 📊 Available Scripts
 
-### Frontend Scripts
 ```bash
 npm run dev      # Start development server
 npm run build    # Build for production
 npm run start    # Start production server
 npm run lint     # Run ESLint
-```
-
-### Backend Scripts
-```bash
-cd backend
-npm run dev              # Start with nodemon (auto-restart)
-npm start                # Start production server
 ```
 
 ## 🌐 API Endpoints
@@ -180,7 +115,7 @@ npm start                # Start production server
 ### Example Usage
 ```bash
 # Test the API
-curl http://localhost:5000/api/rmm/v3/0x7ca24d4443ff5298d9a1729622a116b712a58a56
+curl http://localhost:3000/api/rmm/v3/0x7ca24d4443ff5298d9a1729622a116b712a58a56
 ```
 
 ## 🔧 Troubleshooting
@@ -190,7 +125,6 @@ curl http://localhost:5000/api/rmm/v3/0x7ca24d4443ff5298d9a1729622a116b712a58a56
 #### Port Already in Use
 ```bash
 # Check what's using the port
-lsof -i :5000
 lsof -i :3000
 
 # Kill the process
@@ -199,30 +133,24 @@ kill -9 <PID>
 
 #### Environment Variables Not Loading
 ```bash
-# Verify .env files exist
+# Verify .env file exists
 ls -la .env
-ls -la backend/.env
 
 # Check if variables are loaded
-echo $NEXT_PUBLIC_BACKEND_URL
+echo $NEXT_PUBLIC_GNOSISSCAN_API_KEY
+echo $NEXT_PUBLIC_THEGRAPH_API_KEY
 ```
 
 #### API Key Errors
 ```bash
-# Verify API keys in .env files
+# Verify API keys in .env file
 cat .env | grep API_KEY
-cat backend/.env | grep API_KEY
 ```
 
 #### Dependencies Issues
 ```bash
 # Clear npm cache and reinstall
 npm cache clean --force
-rm -rf node_modules package-lock.json
-npm install
-
-# Backend
-cd backend
 rm -rf node_modules package-lock.json
 npm install
 ```
@@ -238,13 +166,15 @@ npm install
 
 ### Adding New Features
 1. Frontend components go in `components/`
-2. Backend routes go in `backend/routes/`
-3. Utility functions go in `utils/`
-4. Update types in `types/`
+2. API routes go in `pages/api/`
+3. Business logic and services go in `lib/services/`
+4. Utility functions go in `utils/`
+5. Update types in `types/`
 
 ### Code Style
-- Frontend: TypeScript + React hooks
-- Backend: ES6+ JavaScript + Express
+- Framework: Next.js with TypeScript
+- Frontend: React hooks + TypeScript
+- API: Next.js API routes (TypeScript)
 - Styling: TailwindCSS
 - Charts: Chart.js + React-Chartjs-2
 
@@ -263,3 +193,4 @@ Please contact Realtoken DAO.
 ---
 
 **Happy analyzing! 🚀📊**
+
