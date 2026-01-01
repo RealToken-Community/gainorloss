@@ -1,13 +1,14 @@
+import { GraphQLClient } from 'graphql-request';
+
 // Configuration TheGraph V2
 const THEGRAPH_URL_V2 = 'https://api.thegraph.com/subgraphs/id/QmXT8Cpkjevu2sPN1fKkwb7Px9Wqj84DALA2TQ8nokhj7e';
 // Utilise NEXT_PUBLIC_THEGRAPH_API_KEY comme fallback pour compatibilité avec le .env partagé
 const API_KEY = process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
 
-// Client GraphQL V2 (utilise un import dynamique pour ES modules)
-let clientV2 = null;
-async function getClientV2() {
+// Client GraphQL V2
+let clientV2: GraphQLClient | null = null;
+async function getClientV2(): Promise<GraphQLClient> {
   if (!clientV2) {
-    const { GraphQLClient } = await import('graphql-request');
     clientV2 = new GraphQLClient(THEGRAPH_URL_V2, {
       headers: API_KEY ? {
         'Authorization': `Bearer ${API_KEY}`
@@ -54,17 +55,31 @@ const dTokenBalance_V2_QUERY = `query VTokenMovementsV2($user: String!, $first: 
   }
 }`;
 
+interface BalanceItem {
+  timestamp: number;
+  currentATokenBalance?: string;
+  scaledATokenBalance?: string;
+  currentVariableDebt?: string;
+  scaledVariableDebt?: string;
+  index: string;
+  userReserve: {
+    reserve: {
+      symbol: string;
+      decimals: number;
+    };
+  };
+}
+
 /**
  * Récupère tous les atokenBalanceHistoryItems V2 avec pagination
  */
-async function fetchAllATokenBalancesV2(userAddress, req = null) {
+export async function fetchAllATokenBalancesV2(userAddress: string, req: any = null): Promise<BalanceItem[]> {
   const LIMIT = 1000; // Limite TheGraph par défaut
-  const allBalances = [];
+  const allBalances: BalanceItem[] = [];
   let skip = 0;
   let hasMore = true;
 
   try {
-  
     while (hasMore) {
       const variables = { 
         user: userAddress.toLowerCase(), 
@@ -73,10 +88,9 @@ async function fetchAllATokenBalancesV2(userAddress, req = null) {
       };
       
       const client = await getClientV2();
-      const data = await client.request(sTokenBalance_V2_QUERY, variables);
+      const data: { atokenBalanceHistoryItems: BalanceItem[] } = await client.request(sTokenBalance_V2_QUERY, variables);
       const balances = data.atokenBalanceHistoryItems || [];
       
-     
       allBalances.push(...balances);
       
       // Vérifier s'il y a plus de données
@@ -91,8 +105,6 @@ async function fetchAllATokenBalancesV2(userAddress, req = null) {
     const wxdaiBalances = allBalances.filter(balance => 
       balance.userReserve.reserve.symbol === 'rmmWXDAI'
     );
-    
-  
     
     return wxdaiBalances;
     
@@ -105,15 +117,13 @@ async function fetchAllATokenBalancesV2(userAddress, req = null) {
 /**
  * Récupère tous les vtokenBalanceHistoryItems V2 avec pagination
  */
-async function fetchAllVTokenBalancesV2(userAddress, req = null) {
-
+export async function fetchAllVTokenBalancesV2(userAddress: string, req: any = null): Promise<BalanceItem[]> {
   const LIMIT = 1000; // Limite TheGraph par défaut
-  const allBalances = [];
+  const allBalances: BalanceItem[] = [];
   let skip = 0;
   let hasMore = true;
 
   try {
-
     while (hasMore) {
       const variables = { 
         user: userAddress.toLowerCase(), 
@@ -122,9 +132,8 @@ async function fetchAllVTokenBalancesV2(userAddress, req = null) {
       };
       
       const client = await getClientV2();
-      const data = await client.request(dTokenBalance_V2_QUERY, variables);
+      const data: { vtokenBalanceHistoryItems: BalanceItem[] } = await client.request(dTokenBalance_V2_QUERY, variables);
       const balances = data.vtokenBalanceHistoryItems || [];
-      
       
       allBalances.push(...balances);
       
@@ -141,7 +150,6 @@ async function fetchAllVTokenBalancesV2(userAddress, req = null) {
       balance.userReserve.reserve.symbol === 'rmmWXDAI'
     );
     
-   
     return wxdaiBalances;
     
   } catch (error) {  
@@ -153,8 +161,10 @@ async function fetchAllVTokenBalancesV2(userAddress, req = null) {
 /**
  * Récupère tous les balances V2 (atoken + vtoken) en une seule fois
  */
-async function fetchAllTokenBalancesV2(userAddress, req = null) {
-
+export async function fetchAllTokenBalancesV2(userAddress: string, req: any = null): Promise<{
+  atoken: BalanceItem[];
+  vtoken: BalanceItem[];
+}> {
   try {
     console.log(`🚀 Récupération de tous les balances V2 pour ${userAddress}`);
     
@@ -163,9 +173,6 @@ async function fetchAllTokenBalancesV2(userAddress, req = null) {
       fetchAllATokenBalancesV2(userAddress, req),
       fetchAllVTokenBalancesV2(userAddress, req)
     ]);
-    
-    const totalCount = atokenBalances.length + vtokenBalances.length;
-   
     
     return {
       atoken: atokenBalances,
@@ -178,8 +185,3 @@ async function fetchAllTokenBalancesV2(userAddress, req = null) {
   }
 }
 
-module.exports = {
-  fetchAllTokenBalancesV2,
-  fetchAllATokenBalancesV2,
-  fetchAllVTokenBalancesV2
-};

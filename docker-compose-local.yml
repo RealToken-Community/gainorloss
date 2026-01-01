@@ -1,0 +1,28 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Passer les variables NEXT_PUBLIC_* au build (intégrées dans le code compilé)
+        NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+        NEXT_PUBLIC_THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
+        NEXT_PUBLIC_THEGRAPH_API_URL: ${NEXT_PUBLIC_THEGRAPH_API_URL}
+        NEXT_PUBLIC_GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL}
+    container_name: gainorloss-frontend-local
+
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      # Ces variables sont intégrées au build
+      NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+      NEXT_PUBLIC_THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
+      NEXT_PUBLIC_THEGRAPH_API_URL: ${NEXT_PUBLIC_THEGRAPH_API_URL}
+      NEXT_PUBLIC_GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL}
+
+    ports:
+      - "3000:3000"
+
+    restart: unless-stopped
+

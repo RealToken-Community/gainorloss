@@ -1,8 +1,8 @@
-const { fetchAllTokenBalancesV2 } = require('./graphql-v2');
+import { fetchAllTokenBalancesV2 } from './graphql-v2';
 //  Importer le service des transactions V2
-const { fetchAllTransactionsV2, transformTransactionsV2ToFrontendFormat } = require('./fetch-transactions-v2');
+import { fetchAllTransactionsV2, transformTransactionsV2ToFrontendFormat } from './fetch-transactions-v2';
 //  Importer le service GnosisScan
-const { fetchSupplyTokenTransactionsViaGnosisScan } = require('./gnosisscan');
+import { fetchSupplyTokenTransactionsViaGnosisScan } from './gnosisscan';
 
 /**
  * Configuration depuis les variables d'environnement
@@ -13,7 +13,7 @@ const GNOSIS_RPC_URL = process.env.GNOSIS_RPC_URL || process.env.NEXT_PUBLIC_GNO
 
 const RAY = BigInt(10 ** 27); // 1e27
 
-const { TOKENS } = require('../../utils/constants');
+import { TOKENS } from '../../utils/constants';
 
 
 const TOKENS_V2 = {
@@ -32,11 +32,11 @@ const TOKENS_V2 = {
 /**
  * Récupère le balanceOf actuel via RPC pour la V2
  */
-async function getCurrentBalancesV2(userAddress) {
+async function getCurrentBalancesV2(userAddress: string): Promise<any> {
   try {
 
     // Préparer les appels balanceOf pour les tokens V2
-    const calls = Object.entries(TOKENS_V2).map(([key, token], index) => ({
+    const calls = Object.entries(TOKENS_V2).map(([key, token]: [string, any], index: number) => ({
       jsonrpc: "2.0",
       id: index + 1,
       method: "eth_call",
@@ -68,8 +68,8 @@ async function getCurrentBalancesV2(userAddress) {
     }
 
     // Traiter les résultats
-    const balances = {};
-    Object.entries(TOKENS_V2).forEach(([key, token], index) => {
+    const balances: Record<string, any> = {};
+    Object.entries(TOKENS_V2).forEach(([key, token]: [string, any], index: number) => {
       const result = data[index];
 
       if (result && result.result) {
@@ -102,7 +102,7 @@ async function getCurrentBalancesV2(userAddress) {
 /**
  * Calcule les intérêts pour les supply tokens V2 (rmmWXDAI uniquement)
  */
-function calculateSupplyInterestFromBalancesV2(atokenBalances) {
+function calculateSupplyInterestFromBalancesV2(atokenBalances: any[]): any {
   console.log(`💰 Calcul des intérêts de supply V2 pour WXDAI via TheGraph`);
 
   if (!atokenBalances || atokenBalances.length === 0) {
@@ -110,7 +110,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances) {
   }
 
   // Filtrer seulement rmmWXDAI
-  const tokenBalances = atokenBalances.filter(balance =>
+  const tokenBalances = atokenBalances.filter((balance: any) =>
     balance.userReserve.reserve.symbol === 'rmmWXDAI'
   );
 
@@ -121,21 +121,21 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances) {
   console.log(`📊 ${tokenBalances.length} balances atoken V2 trouvées pour WXDAI`);
 
   // Trier par timestamp et dédupliquer par jour (garder le dernier)
-  const sortedBalances = tokenBalances.sort((a, b) => a.timestamp - b.timestamp);
-  const balancesByDay = new Map();
+  const sortedBalances = tokenBalances.sort((a: any, b: any) => a.timestamp - b.timestamp);
+  const balancesByDay = new Map<string, any>();
 
-  sortedBalances.forEach(balance => {
+  sortedBalances.forEach((balance: any) => {
     const dateKey = formatDateYYYYMMDD(balance.timestamp);
     balancesByDay.set(dateKey, balance); // Le dernier écrase le précédent
   });
 
   const dailyBalances = Array.from(balancesByDay.values())
-    .sort((a, b) => a.timestamp - b.timestamp);
+    .sort((a: any, b: any) => a.timestamp - b.timestamp);
 
   console.log(`📅 ${dailyBalances.length} jours uniques trouvés (après déduplication)`);
 
   // Traiter chaque jour
-  const dailyDetails = [];
+  const dailyDetails: any[] = [];
   let totalInterest = 0n;
   let currentSupply = 0n;
   let totalSupplies = 0n;
@@ -156,7 +156,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances) {
       dayTotalInterest = 0n;
     } else {
       // Jour suivant : comparer avec le jour précédent
-      const previousBalance = dailyBalances[i - 1];
+      const previousBalance: any = dailyBalances[i - 1];
       const previousATokenBalance = BigInt(previousBalance.currentATokenBalance);
       const previousScaledATokenBalance = BigInt(previousBalance.scaledATokenBalance);
       const previousIndex = BigInt(previousBalance.index);
@@ -221,7 +221,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances) {
 /**
  * Calcule les intérêts pour les debt tokens V2 (debtWXDAI uniquement)
  */
-function calculateDebtInterestFromBalancesV2(vtokenBalances) {
+function calculateDebtInterestFromBalancesV2(vtokenBalances: any[]): any {
   console.log(`💰 Calcul des intérêts de dette V2 pour WXDAI via TheGraph`);
 
   if (!vtokenBalances || vtokenBalances.length === 0) {
@@ -229,7 +229,7 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances) {
   }
 
   // Filtrer seulement rmmWXDAI
-  const tokenBalances = vtokenBalances.filter(balance =>
+  const tokenBalances = vtokenBalances.filter((balance: any) =>
     balance.userReserve.reserve.symbol === 'rmmWXDAI'
   );
 
@@ -240,19 +240,19 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances) {
   console.log(`📊 ${tokenBalances.length} balances vtoken V2 trouvées pour WXDAI`);
 
   // Trier par timestamp et dédupliquer par jour (garder le dernier)
-  const sortedBalances = tokenBalances.sort((a, b) => a.timestamp - b.timestamp);
-  const balancesByDay = new Map();
+  const sortedBalances = tokenBalances.sort((a: any, b: any) => a.timestamp - b.timestamp);
+  const balancesByDay = new Map<string, any>();
 
-  sortedBalances.forEach(balance => {
+  sortedBalances.forEach((balance: any) => {
     const dateKey = formatDateYYYYMMDD(balance.timestamp);
     balancesByDay.set(dateKey, balance); // Le dernier écrase le précédent
   });
 
   const dailyBalances = Array.from(balancesByDay.values())
-    .sort((a, b) => a.timestamp - b.timestamp);
+    .sort((a: any, b: any) => a.timestamp - b.timestamp);
 
   // Traiter chaque jour
-  const dailyDetails = [];
+  const dailyDetails: any[] = [];
   let totalInterest = 0n;
   let currentDebt = 0n;
   let totalBorrows = 0n;
@@ -284,7 +284,7 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances) {
       }
     } else {
       // Balance suivante
-      const previousBalance = dailyBalances[i - 1];
+      const previousBalance: any = dailyBalances[i - 1];
       const previousVariableDebt = BigInt(previousBalance.currentVariableDebt);
       const previousScaledVariableDebt = BigInt(previousBalance.scaledVariableDebt);
       const previousIndex = BigInt(previousBalance.index);
@@ -346,7 +346,7 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances) {
   };
 }
 
-async function retrieveInterestAndTransactionsForAllTokensV2(userAddress, req = null) {
+async function retrieveInterestAndTransactionsForAllTokensV2(userAddress: string, req: any = null): Promise<any> {
   console.log(`🚀 Calcul des intérêts V2 pour WXDAI via TheGraph`);
 
   try {
@@ -428,14 +428,14 @@ async function retrieveInterestAndTransactionsForAllTokensV2(userAddress, req = 
 /**
  * Crée un relevé journalier combiné V2 au format YYYYMMDD
  */
-function createDailyStatementV2(borrowDetails, supplyDetails) {
+function createDailyStatementV2(borrowDetails: any[], supplyDetails: any[]): any[] {
   console.log(`📊 Création du relevé journalier V2 pour WXDAI`);
 
   // Combiner tous les détails journaliers
-  const allDailyDetails = [];
+  const allDailyDetails: any[] = [];
 
   // Ajouter les détails d'emprunt
-  borrowDetails.forEach(detail => {
+  borrowDetails.forEach((detail: any) => {
     allDailyDetails.push({
       date: detail.date,
       timestamp: detail.timestamp,
@@ -451,7 +451,7 @@ function createDailyStatementV2(borrowDetails, supplyDetails) {
   });
 
   // Ajouter les détails de dépôt
-  supplyDetails.forEach(detail => {
+  supplyDetails.forEach((detail: any) => {
     allDailyDetails.push({
       date: detail.date,
       timestamp: detail.timestamp,
@@ -467,9 +467,9 @@ function createDailyStatementV2(borrowDetails, supplyDetails) {
   });
 
   // Grouper par date et créer le relevé journalier
-  const dailyStatement = {};
+  const dailyStatement: Record<string, any> = {};
 
-  allDailyDetails.forEach(detail => {
+  allDailyDetails.forEach((detail: any) => {
     const dateKey = detail.date;
 
     if (!dailyStatement[dateKey]) {
@@ -507,7 +507,7 @@ function createDailyStatementV2(borrowDetails, supplyDetails) {
   });
 
   // Convertir en tableau et trier par date
-  const statementArray = Object.values(dailyStatement).sort((a, b) => a.timestamp - b.timestamp);
+  const statementArray = Object.values(dailyStatement).sort((a: any, b: any) => a.timestamp - b.timestamp);
 
   console.log(`📊 Relevé journalier V2 créé: ${statementArray.length} jours pour WXDAI`);
 
@@ -517,7 +517,7 @@ function createDailyStatementV2(borrowDetails, supplyDetails) {
 /**
  * Ajoute un point "aujourd'hui" aux dailyDetails V2
  */
-function addTodayPointV2(dailyDetails, currentBalance, balanceType) {
+function addTodayPointV2(dailyDetails: any[], currentBalance: string, balanceType: string): any[] {
   if (dailyDetails.length === 0) return dailyDetails;
 
   // Récupérer le dernier point pour avoir le totalInterest
@@ -548,7 +548,7 @@ function addTodayPointV2(dailyDetails, currentBalance, balanceType) {
 /**
  *  Calcule les intérêts du dernier point avec le balanceOf actuel V2
  */
-function calculateLastPointInterestV2(lastPoint, currentBalance, balanceType) {
+function calculateLastPointInterestV2(lastPoint: any, currentBalance: string, balanceType: string): any {
   if (!lastPoint || !currentBalance) return lastPoint;
 
   const currentBalanceWei = BigInt(currentBalance);
@@ -592,7 +592,7 @@ function calculateLastPointInterestV2(lastPoint, currentBalance, balanceType) {
 /**
  * Crée un résultat vide pour les cas sans données V2
  */
-function createEmptyResultV2(type) {
+function createEmptyResultV2(type: string): any {
   const emptySummary = type === 'supply'
     ? {
       totalSupplies: "0",
@@ -617,7 +617,7 @@ function createEmptyResultV2(type) {
 /**
  * Formate une date en YYYYMMDD
  */
-function formatDateYYYYMMDD(timestamp) {
+function formatDateYYYYMMDD(timestamp: number): string {
   const date = new Date(timestamp * 1000);
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -626,9 +626,7 @@ function formatDateYYYYMMDD(timestamp) {
   return `${year}${month}${day}`;
 }
 
-module.exports = {
+export {
   retrieveInterestAndTransactionsForAllTokensV2,
-  calculateSupplyInterestFromBalancesV2,
-  calculateDebtInterestFromBalancesV2,
   createDailyStatementV2
 };

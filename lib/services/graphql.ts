@@ -1,13 +1,14 @@
+import { GraphQLClient } from 'graphql-request';
+
 // Configuration TheGraph
 const THEGRAPH_URL = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
 // Utilise NEXT_PUBLIC_THEGRAPH_API_KEY comme fallback pour compatibilité avec le .env partagé
 const API_KEY = process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
 
-// Client GraphQL (utilise un import dynamique pour ES modules)
-let client = null;
-async function getClient() {
+// Client GraphQL
+let client: GraphQLClient | null = null;
+async function getClient(): Promise<GraphQLClient> {
   if (!client) {
-    const { GraphQLClient } = await import('graphql-request');
     client = new GraphQLClient(THEGRAPH_URL, {
       headers: API_KEY ? {
         'Authorization': `Bearer ${API_KEY}`
@@ -54,19 +55,31 @@ const dTokenBalance_QUERY = `query VTokenMovements($user: String!, $first: Int!,
   }
 }`;
 
+interface BalanceItem {
+  timestamp: number;
+  currentATokenBalance?: string;
+  scaledATokenBalance?: string;
+  currentVariableDebt?: string;
+  scaledVariableDebt?: string;
+  index: string;
+  userReserve: {
+    reserve: {
+      symbol: string;
+      decimals: number;
+    };
+  };
+}
 
 /**
  * Récupère tous les atokenBalanceHistoryItems avec pagination
  */
-async function fetchAllATokenBalances(userAddress) {
-
+export async function fetchAllATokenBalances(userAddress: string): Promise<BalanceItem[]> {
   const LIMIT = 1000; // Limite TheGraph par défaut
-  const allBalances = [];
+  const allBalances: BalanceItem[] = [];
   let skip = 0;
   let hasMore = true;
   
   try {
-
     while (hasMore) {
       const variables = { 
         user: userAddress.toLowerCase(),
@@ -75,7 +88,7 @@ async function fetchAllATokenBalances(userAddress) {
       };
       
       const graphqlClient = await getClient();
-      const data = await graphqlClient.request(sTokenBalance_QUERY, variables);
+      const data: { atokenBalanceHistoryItems: BalanceItem[] } = await graphqlClient.request(sTokenBalance_QUERY, variables);
       const balances = data.atokenBalanceHistoryItems || [];
       
       // Filtrer seulement USDC et WXDAI
@@ -95,7 +108,6 @@ async function fetchAllATokenBalances(userAddress) {
       }
     }
     
-  
     return allBalances;
     
   } catch (error) {  
@@ -107,15 +119,13 @@ async function fetchAllATokenBalances(userAddress) {
 /**
  * Récupère tous les vtokenBalanceHistoryItems avec pagination
  */
-async function fetchAllVTokenBalances(userAddress, req = null) {
-
+export async function fetchAllVTokenBalances(userAddress: string, req: any = null): Promise<BalanceItem[]> {
   const LIMIT = 1000; // Limite TheGraph par défaut
-  const allBalances = [];
+  const allBalances: BalanceItem[] = [];
   let skip = 0;
   let hasMore = true;
   
   try {
-
     while (hasMore) {
       const variables = { 
         user: userAddress.toLowerCase(),
@@ -124,7 +134,7 @@ async function fetchAllVTokenBalances(userAddress, req = null) {
       };
       
       const graphqlClient = await getClient();
-      const data = await graphqlClient.request(dTokenBalance_QUERY, variables);
+      const data: { vtokenBalanceHistoryItems: BalanceItem[] } = await graphqlClient.request(dTokenBalance_QUERY, variables);
       const balances = data.vtokenBalanceHistoryItems || [];
       
       // Filtrer seulement USDC et WXDAI
@@ -144,11 +154,9 @@ async function fetchAllVTokenBalances(userAddress, req = null) {
       }
     }
     
-  
     return allBalances;
     
   } catch (error) {
- 
     console.error('❌ Erreur lors de la récupération des vtoken balances:', error);
     throw error;
   }
@@ -157,9 +165,11 @@ async function fetchAllVTokenBalances(userAddress, req = null) {
 /**
  * Récupère tous les balances (atoken + vtoken) avec pagination
  */
-async function fetchAllTokenBalances(userAddress) {
-
-  
+export async function fetchAllTokenBalances(userAddress: string): Promise<{
+  atoken: BalanceItem[];
+  vtoken: BalanceItem[];
+  total: number;
+}> {
   try {
     console.log(`🚀 Récupération de tous les balances pour ${userAddress}`);
     
@@ -175,7 +185,6 @@ async function fetchAllTokenBalances(userAddress) {
       total: atokenBalances.length + vtokenBalances.length
     };
     
-   
     return result;
     
   } catch (error) {
@@ -184,11 +193,5 @@ async function fetchAllTokenBalances(userAddress) {
   }
 }
 
-module.exports = {
-  fetchAllATokenBalances,
-  fetchAllVTokenBalances,
-  fetchAllTokenBalances,
-  // Queries exportées pour référence
-  sTokenBalance_QUERY,
-  dTokenBalance_QUERY
-};
+export { sTokenBalance_QUERY, dTokenBalance_QUERY };
+

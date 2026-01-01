@@ -1,13 +1,14 @@
+import { GraphQLClient } from 'graphql-request';
+
 // Configuration TheGraph V3
 const THEGRAPH_URL_V3 = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
 // Utilise NEXT_PUBLIC_THEGRAPH_API_KEY comme fallback pour compatibilité avec le .env partagé
 const API_KEY = process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
 
-// Client GraphQL (utilise un import dynamique pour ES modules)
-let client = null;
-async function getClient() {
+// Client GraphQL
+let client: GraphQLClient | null = null;
+async function getClient(): Promise<GraphQLClient> {
   if (!client) {
-    const { GraphQLClient } = await import('graphql-request');
     client = new GraphQLClient(THEGRAPH_URL_V3, {
       headers: {
         ...(API_KEY ? { 'Authorization': `Bearer ${API_KEY}` } : {}),
@@ -17,14 +18,21 @@ async function getClient() {
   return client;
 }
 
+interface TypesToFetch {
+  borrows?: boolean;
+  supplies?: boolean;
+  withdraws?: boolean;
+  repays?: boolean;
+}
+
 /**
  * Génère dynamiquement la requête GraphQL en fonction des types de transactions à récupérer
  * @param {Object} typesToFetch - Objet avec les flags pour chaque type { borrows, supplies, withdraws, repays }
  * @returns {string} - Requête GraphQL
  */
-function buildTransactionsQueryV3(typesToFetch) {
-  const queryParts = [];
-  const variables = [];
+function buildTransactionsQueryV3(typesToFetch: TypesToFetch): string {
+  const queryParts: string[] = [];
+  const variables: string[] = [];
   
   // Toujours déclarer les variables communes
   variables.push('$userAddress: String!');
@@ -135,9 +143,9 @@ ${queryParts.join('')}
  * @param {string} userAddress - Adresse de l'utilisateur
  * @param {boolean} debug - Si true, affiche les logs détaillés (défaut: false)
  */
-async function fetchAllTransactionsV3(userAddress, debug = false) {
+async function fetchAllTransactionsV3(userAddress: string, debug: boolean = false): Promise<any> {
   const LIMIT = 1000;
-  const allTransactions = {
+  const allTransactions: any = {
     borrows: [],
     supplies: [],
     withdraws: [],
@@ -182,7 +190,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       const query = buildTransactionsQueryV3(typesToFetch);
       
       // Préparer les variables pour la requête (seulement celles nécessaires)
-      const variables = {
+      const variables: any = {
         userAddress: userAddress.toLowerCase(),
         first: LIMIT
       };
@@ -208,7 +216,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       }
 
       const graphqlClient = await getClient();
-      let data;
+      let data: any;
       try {
         data = await graphqlClient.request(query, variables);
       } catch (error) {
@@ -224,7 +232,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
 
       // Traiter chaque type de transaction
       if (typesToFetch.borrows && data.borrows) {
-        const filteredBorrows = (data.borrows || []).filter(tx =>
+        const filteredBorrows = (data.borrows || []).filter((tx: any) =>
           validSymbols.includes(tx.reserve?.symbol)
         );
         allTransactions.borrows.push(...filteredBorrows);
@@ -238,7 +246,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       }
 
       if (typesToFetch.supplies && data.supplies) {
-        const filteredSupplies = (data.supplies || []).filter(tx =>
+        const filteredSupplies = (data.supplies || []).filter((tx: any) =>
           validSymbols.includes(tx.reserve?.symbol)
         );
         allTransactions.supplies.push(...filteredSupplies);
@@ -251,7 +259,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       }
 
       if (typesToFetch.withdraws && data.withdraws) {
-        const filteredWithdraws = (data.withdraws || []).filter(tx =>
+        const filteredWithdraws = (data.withdraws || []).filter((tx: any) =>
           validSymbols.includes(tx.reserve?.symbol)
         );
         allTransactions.withdraws.push(...filteredWithdraws);
@@ -264,7 +272,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       }
 
       if (typesToFetch.repays && data.repays) {
-        const filteredRepays = (data.repays || []).filter(tx =>
+        const filteredRepays = (data.repays || []).filter((tx: any) =>
           validSymbols.includes(tx.reserve?.symbol)
         );
         allTransactions.repays.push(...filteredRepays);
@@ -279,8 +287,8 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
       // Logs détaillés uniquement en mode debug
       if (debug) {
         const activeTypes = Object.entries(typesToFetch)
-          .filter(([_, active]) => active)
-          .map(([type, _]) => type)
+          .filter(([_, active]: [string, boolean]) => active)
+          .map(([type, _]: [string, boolean]) => type)
           .join(', ');
         
         console.log(`\n📦 Batch #${batchNumber} (types: ${activeTypes}):`);
@@ -326,7 +334,7 @@ async function fetchAllTransactionsV3(userAddress, debug = false) {
  * Format: "32350433:4:0x4d1c2ad0bf1b47500ddbab4640230f8c05a920b5282816ea256d8bb315e1b9e6:14:14"
  * Le txHash est entre le 2ème et 3ème ":"
  */
-function extractTxHashFromId(id) {
+function extractTxHashFromId(id: string | null | undefined): string | null {
   if (!id || typeof id !== 'string') return null;
 
   const parts = id.split(':');
@@ -337,23 +345,40 @@ function extractTxHashFromId(id) {
   return null;
 }
 
+interface FrontendTransaction {
+  txHash: string;
+  amount: string;
+  timestamp: number;
+  type: string;
+  token: string;
+  version: string;
+}
+
+interface FrontendTransactions {
+  USDC: { debt: FrontendTransaction[]; supply: FrontendTransaction[] };
+  WXDAI: { debt: FrontendTransaction[]; supply: FrontendTransaction[] };
+}
+
 /**
  * Transforme les transactions V3 en format compatible frontend
  */
-function transformTransactionsV3ToFrontendFormat(transactions, gnosisTransactions = null) {
-  const frontendTransactions = {
+function transformTransactionsV3ToFrontendFormat(
+  transactions: any, 
+  gnosisTransactions: Record<string, FrontendTransaction[]> | null = null
+): FrontendTransactions {
+  const frontendTransactions: FrontendTransactions = {
     USDC: { debt: [], supply: [] },
     WXDAI: { debt: [], supply: [] }
   };
 
   // Fonction helper pour déterminer le token
-  function getTokenFromReserve(reserve) {
+  function getTokenFromReserve(reserve: any): keyof FrontendTransactions {
     if (!reserve || !reserve.symbol) return 'WXDAI';
     return reserve.symbol === 'USDC' ? 'USDC' : 'WXDAI';
   }
 
   // Traiter les borrows (debt)
-  transactions.borrows.forEach(tx => {
+  transactions.borrows.forEach((tx: any) => {
     const token = getTokenFromReserve(tx.reserve);
     const txHash = extractTxHashFromId(tx.id);
 
@@ -370,7 +395,7 @@ function transformTransactionsV3ToFrontendFormat(transactions, gnosisTransaction
   });
 
   // Traiter les repays (debt)
-  transactions.repays.forEach(tx => {
+  transactions.repays.forEach((tx: any) => {
     const token = getTokenFromReserve(tx.reserve);
     const txHash = extractTxHashFromId(tx.id);
 
@@ -387,7 +412,7 @@ function transformTransactionsV3ToFrontendFormat(transactions, gnosisTransaction
   });
 
   // Traiter les supplies (supply)
-  transactions.supplies.forEach(tx => {
+  transactions.supplies.forEach((tx: any) => {
     const token = getTokenFromReserve(tx.reserve);
     const txHash = extractTxHashFromId(tx.id);
 
@@ -404,7 +429,7 @@ function transformTransactionsV3ToFrontendFormat(transactions, gnosisTransaction
   });
 
   // Traiter les withdraws (supply)
-  transactions.withdraws.forEach(tx => {
+  transactions.withdraws.forEach((tx: any) => {
     const token = getTokenFromReserve(tx.reserve);
     const txHash = extractTxHashFromId(tx.id);
 
@@ -427,25 +452,20 @@ function transformTransactionsV3ToFrontendFormat(transactions, gnosisTransaction
     Object.keys(gnosisTransactions).forEach(tokenSymbol => {
       const gnosisTxs = gnosisTransactions[tokenSymbol] || [];
 
-      if (gnosisTxs.length > 0) {
-
-        frontendTransactions[tokenSymbol].supply.push(...gnosisTxs);
+      if (gnosisTxs.length > 0 && (tokenSymbol === 'USDC' || tokenSymbol === 'WXDAI')) {
+        frontendTransactions[tokenSymbol as keyof FrontendTransactions].supply.push(...gnosisTxs);
 
         console.log(`➕ ${gnosisTxs.length} transactions GnosisScan ajoutées pour ${tokenSymbol}`);
       }
     });
 
     //Trier toutes les transactions supply par timestamp (plus vieux → plus récent)
-    Object.keys(frontendTransactions).forEach(tokenSymbol => {
-      frontendTransactions[tokenSymbol].supply.sort((a, b) => a.timestamp - b.timestamp);
+    (Object.keys(frontendTransactions) as Array<keyof FrontendTransactions>).forEach(tokenSymbol => {
+      frontendTransactions[tokenSymbol].supply.sort((a: any, b: any) => a.timestamp - b.timestamp);
     });
   }
 
   return frontendTransactions;
 }
 
-module.exports = {
-  fetchAllTransactionsV3,
-  transformTransactionsV3ToFrontendFormat,
-  extractTxHashFromId
-};
+export { fetchAllTransactionsV3, transformTransactionsV3ToFrontendFormat, extractTxHashFromId };

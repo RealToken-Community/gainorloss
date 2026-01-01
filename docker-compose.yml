@@ -1,53 +1,12 @@
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: gainorloss-backend
-
-    environment:
-      NODE_ENV: production
-      PORT: 3001
-      # Utiliser THEGRAPH_API_KEY (sans NEXT_PUBLIC_) pour que ce soit côté serveur uniquement
-      THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
-      GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
-      GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL:-https://rpc.gnosischain.com/}
-      CORS_ORIGIN: https://gainorloss.battistu.com
-
-    expose:
-      - "3001"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik_default"
-      
-      # HTTP → redirection HTTPS
-      - "traefik.http.routers.gainorloss-api-http.rule=Host(`api-gainorloss.battistu.com`)"
-      - "traefik.http.routers.gainorloss-api-http.entrypoints=web"
-      - "traefik.http.routers.gainorloss-api-http.middlewares=redirect-to-https@file"
-      
-      # HTTPS
-      - "traefik.http.routers.gainorloss-api.rule=Host(`api-gainorloss.battistu.com`)"
-      - "traefik.http.routers.gainorloss-api.entrypoints=websecure"
-      - "traefik.http.routers.gainorloss-api.tls.certresolver=letsencrypt"
-      
-      # Service interne à exposer
-      - "traefik.http.services.gainorloss-api.loadbalancer.server.port=3001"
-
-    networks:
-      - traefik
-      - internal
-
-    restart: unless-stopped
-
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         # Passer les variables NEXT_PUBLIC_* au build (intégrées dans le code compilé)
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
-        NEXT_PUBLIC_FRONTEND_URL: ${NEXT_PUBLIC_FRONTEND_URL}
         NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+        NEXT_PUBLIC_THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
         NEXT_PUBLIC_THEGRAPH_API_URL: ${NEXT_PUBLIC_THEGRAPH_API_URL}
         NEXT_PUBLIC_GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL}
     container_name: gainorloss-frontend
@@ -56,11 +15,11 @@ services:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
-      # Ces variables ne sont plus nécessaires au runtime car intégrées au build
-      # mais on peut les garder pour compatibilité
-      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+      # Ces variables sont intégrées au build
       NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+      NEXT_PUBLIC_THEGRAPH_API_KEY: ${NEXT_PUBLIC_THEGRAPH_API_KEY}
       NEXT_PUBLIC_THEGRAPH_API_URL: ${NEXT_PUBLIC_THEGRAPH_API_URL}
+      NEXT_PUBLIC_GNOSIS_RPC_URL: ${NEXT_PUBLIC_GNOSIS_RPC_URL}
 
     labels:
       - "traefik.enable=true"
@@ -79,8 +38,6 @@ services:
       # service interne à exposer
       - "traefik.http.services.gainorloss.loadbalancer.server.port=3000"
 
-    depends_on:
-      - backend
 
     networks:
       - traefik
