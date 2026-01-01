@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { isAddress, getAddress } from 'ethers';
 import { retrieveInterestAndTransactionsForAllTokens } from '../../../../lib/services/thegraph-interest-calculator';
 
 /**
@@ -20,15 +21,29 @@ export default async function handler(
     // Convertir addresses en tableau
     const addressArray = Array.isArray(addresses) ? addresses : [addresses].filter(Boolean);
     
-    // Validation des adresses
+    // Validation des adresses avec vérification du checksum EIP-55
+    const normalizedAddresses: string[] = [];
     for (const address of addressArray) {
-      if (typeof address !== 'string' || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      if (typeof address !== 'string' || !isAddress(address)) {
         return res.status(400).json({
           error: 'Adresse invalide',
           message: 'Toutes les adresses doivent être des adresses Ethereum valides (0x...)',
           invalidAddress: address
         });
       }
+      
+      // Normaliser avec le bon checksum EIP-55
+      // getAddress() valide et corrige automatiquement le checksum
+      const normalized = getAddress(address);
+      
+      // Si l'adresse fournie n'avait pas le bon checksum, on la normalise
+      // (getAddress() lève une erreur si l'adresse est invalide, donc on est sûr qu'elle est valide ici)
+      if (address !== normalized && address.toLowerCase() !== normalized.toLowerCase()) {
+        // L'adresse était valide mais avec un mauvais checksum - normalisée automatiquement
+        // En production, on pourrait logger cela pour des raisons de sécurité
+      }
+      
+      normalizedAddresses.push(normalized);
     }
 
     if (addressArray.length === 0) {
@@ -46,8 +61,7 @@ export default async function handler(
     }
 
     const results: any[] = [];
-    for (const address of addressArray) {
-      if (typeof address !== 'string') continue;
+    for (const address of normalizedAddresses) {
       try {
         // Initialiser les calculs d'intérêts pour cette adresse
         const interestCalculations: any = {};
@@ -86,10 +100,10 @@ export default async function handler(
     const response = {
       success: true,
       data: {
-        addresses: addressArray,
+        addresses: normalizedAddresses,
         results: results,
         summary: {
-          totalAddresses: addressArray.length,
+          totalAddresses: normalizedAddresses.length,
           successful: successfulResults.length,
           failed: failedResults.length,
           stablecoins: ['USDC', 'WXDAI']

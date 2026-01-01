@@ -1,4 +1,5 @@
 import { GraphQLClient } from 'graphql-request';
+import logger from '../../utils/logger';
 
 // Configuration TheGraph V2
 const THEGRAPH_URL_V2 = 'https://api.thegraph.com/subgraphs/id/QmXT8Cpkjevu2sPN1fKkwb7Px9Wqj84DALA2TQ8nokhj7e';
@@ -109,7 +110,7 @@ export async function fetchAllATokenBalancesV2(userAddress: string, req: any = n
     return wxdaiBalances;
     
   } catch (error) {   
-    console.error('❌ Erreur lors de la récupération des balances atoken V2:', error);
+    logger.error('Erreur lors de la récupération des balances atoken V2:', error);
     throw error;
   }
 }
@@ -153,7 +154,7 @@ export async function fetchAllVTokenBalancesV2(userAddress: string, req: any = n
     return wxdaiBalances;
     
   } catch (error) {  
-    console.error('❌ Erreur lors de la récupération des balances vtoken V2:', error);
+    logger.error('Erreur lors de la récupération des balances vtoken V2:', error);
     throw error;
   }
 }
@@ -166,7 +167,7 @@ export async function fetchAllTokenBalancesV2(userAddress: string, req: any = nu
   vtoken: BalanceItem[];
 }> {
   try {
-    console.log(`🚀 Récupération de tous les balances V2 pour ${userAddress}`);
+    logger.info(`Récupération de tous les balances V2 pour ${userAddress}`);
     
     // Récupérer en parallèle
     const [atokenBalances, vtokenBalances] = await Promise.all([
@@ -180,7 +181,7 @@ export async function fetchAllTokenBalancesV2(userAddress: string, req: any = nu
     };
     
   } catch (error) { 
-    console.error('❌ Erreur lors de la récupération de tous les balances V2:', error);
+    logger.error('Erreur lors de la récupération de tous les balances V2:', error);
     throw error;
   }
 }

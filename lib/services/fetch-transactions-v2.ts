@@ -1,4 +1,5 @@
 import { GraphQLClient } from 'graphql-request';
+import logger from '../../utils/logger';
 
 // Configuration TheGraph V2
 const THEGRAPH_URL_V2 = 'https://api.thegraph.com/subgraphs/id/QmXT8Cpkjevu2sPN1fKkwb7Px9Wqj84DALA2TQ8nokhj7e';
@@ -173,7 +174,7 @@ export async function fetchAllTransactionsV2(userAddress: string): Promise<AllTr
         hasMore = false;
       } else {
         skip += LIMIT;
-        console.log(`⏭️  Pagination suivante V2: skip=${skip}`);
+        logger.debug(`Pagination suivante V2: skip=${skip}`);
       }
     }
     
@@ -184,7 +185,7 @@ export async function fetchAllTransactionsV2(userAddress: string): Promise<AllTr
     return allTransactions;
     
   } catch (error) {   
-    console.error('❌ Erreur lors de la récupération des transactions V2:', error);
+    logger.error('Erreur lors de la récupération des transactions V2:', error);
     throw error;
   }
 }
@@ -289,7 +290,7 @@ export function transformTransactionsV2ToFrontendFormat(
     }
   });
   
-  console.log(`🔄 Transactions V2 transformées: ${frontendTransactions.WXDAI.debt.length} debt, ${frontendTransactions.WXDAI.supply.length} supply`);
+  logger.debug(`Transactions V2 transformées: ${frontendTransactions.WXDAI.debt.length} debt, ${frontendTransactions.WXDAI.supply.length} supply`);
 
   // Ajouter les transactions GnosisScan (supply tokens uniquement)
   if (gnosisTransactions) {
@@ -300,7 +301,7 @@ export function transformTransactionsV2ToFrontendFormat(
         // Ajouter à la section supply du bon token
         frontendTransactions[tokenSymbol as keyof FrontendTransactions].supply.push(...gnosisTxs);
         
-        console.log(`➕ ${gnosisTxs.length} transactions GnosisScan ajoutées pour ${tokenSymbol}`);
+        logger.info(`${gnosisTxs.length} transactions GnosisScan ajoutées pour ${tokenSymbol}`);
       }
     });
     

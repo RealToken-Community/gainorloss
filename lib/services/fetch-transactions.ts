@@ -1,4 +1,5 @@
 import { GraphQLClient } from 'graphql-request';
+import logger from '../../utils/logger';
 
 // Configuration TheGraph V3
 const THEGRAPH_URL_V3 = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
@@ -170,7 +171,7 @@ async function fetchAllTransactionsV3(userAddress: string, debug: boolean = fals
 
   try {
     if (debug) {
-      console.log(`🚀 Début de la récupération des transactions V3 pour ${userAddress}`);
+      logger.info(`Début de la récupération des transactions V3 pour ${userAddress}`);
     }
     let batchNumber = 0;
 
@@ -210,9 +211,9 @@ async function fetchAllTransactionsV3(userAddress: string, debug: boolean = fals
       }
 
       if (debug) {
-        console.log(`📤 Requête GraphQL (batch ${batchNumber}):`);
-        console.log(query);
-        console.log(`📦 Variables:`, JSON.stringify(variables, null, 2));
+        logger.debug(`Requête GraphQL (batch ${batchNumber}):`);
+        logger.debug(query);
+        logger.debug(`Variables:`, JSON.stringify(variables, null, 2));
       }
 
       const graphqlClient = await getClient();
@@ -221,9 +222,9 @@ async function fetchAllTransactionsV3(userAddress: string, debug: boolean = fals
         data = await graphqlClient.request(query, variables);
       } catch (error) {
         if (debug) {
-          console.error(`❌ Erreur GraphQL détaillée:`, error);
-          console.error(`🔍 Requête envoyée:`, query);
-          console.error(`🔍 Variables envoyées:`, JSON.stringify(variables, null, 2));
+          logger.error(`Erreur GraphQL détaillée:`, error);
+          logger.debug(`Requête envoyée:`, query);
+          logger.debug(`Variables envoyées:`, JSON.stringify(variables, null, 2));
         }
         throw error;
       }
@@ -291,18 +292,18 @@ async function fetchAllTransactionsV3(userAddress: string, debug: boolean = fals
           .map(([type, _]: [string, boolean]) => type)
           .join(', ');
         
-        console.log(`\n📦 Batch #${batchNumber} (types: ${activeTypes}):`);
+        logger.debug(`Batch #${batchNumber} (types: ${activeTypes}):`);
         if (typesToFetch.borrows) {
-          console.log(`   borrows: ${data.borrows?.length || 0} → total: ${allTransactions.borrows.length} ${limitReached.borrows ? '(terminé)' : ''}`);
+          logger.debug(`   borrows: ${data.borrows?.length || 0} → total: ${allTransactions.borrows.length} ${limitReached.borrows ? '(terminé)' : ''}`);
         }
         if (typesToFetch.supplies) {
-          console.log(`   supplies: ${data.supplies?.length || 0} → total: ${allTransactions.supplies.length} ${limitReached.supplies ? '(terminé)' : ''}`);
+          logger.debug(`   supplies: ${data.supplies?.length || 0} → total: ${allTransactions.supplies.length} ${limitReached.supplies ? '(terminé)' : ''}`);
         }
         if (typesToFetch.withdraws) {
-          console.log(`   withdraws: ${data.withdraws?.length || 0} → total: ${allTransactions.withdraws.length} ${limitReached.withdraws ? '(terminé)' : ''}`);
+          logger.debug(`   withdraws: ${data.withdraws?.length || 0} → total: ${allTransactions.withdraws.length} ${limitReached.withdraws ? '(terminé)' : ''}`);
         }
         if (typesToFetch.repays) {
-          console.log(`   repays: ${data.repays?.length || 0} → total: ${allTransactions.repays.length} ${limitReached.repays ? '(terminé)' : ''}`);
+          logger.debug(`   repays: ${data.repays?.length || 0} → total: ${allTransactions.repays.length} ${limitReached.repays ? '(terminé)' : ''}`);
         }
       }
     }
@@ -312,19 +313,14 @@ async function fetchAllTransactionsV3(userAddress: string, debug: boolean = fals
 
     // Logs finaux récapitulatifs uniquement en mode debug
     if (debug) {
-      console.log(`\n✅ Récupération terminée !`);
-      console.log(`📊 Résumé final:`);
-      console.log(`   borrows: ${allTransactions.borrows.length}`);
-      console.log(`   supplies: ${allTransactions.supplies.length}`);
-      console.log(`   withdraws: ${allTransactions.withdraws.length}`);
-      console.log(`   repays: ${allTransactions.repays.length}`);
-      console.log(`   TOTAL: ${totalTransactions} transactions\n`);
+      logger.info(`Récupération terminée !`);
+      logger.info(`Résumé final: borrows: ${allTransactions.borrows.length}, supplies: ${allTransactions.supplies.length}, withdraws: ${allTransactions.withdraws.length}, repays: ${allTransactions.repays.length}, TOTAL: ${totalTransactions} transactions`);
     }
 
     return allTransactions;
 
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération des transactions V3:', error);
+    logger.error('Erreur lors de la récupération des transactions V3:', error);
     throw error;
   }
 }
@@ -445,7 +441,7 @@ function transformTransactionsV3ToFrontendFormat(
     }
   });
 
-  console.log(`🔄 Transactions V3 transformées: ${frontendTransactions.USDC.debt.length + frontendTransactions.USDC.supply.length} USDC, ${frontendTransactions.WXDAI.debt.length + frontendTransactions.WXDAI.supply.length} WXDAI`);
+  logger.debug(`Transactions V3 transformées: ${frontendTransactions.USDC.debt.length + frontendTransactions.USDC.supply.length} USDC, ${frontendTransactions.WXDAI.debt.length + frontendTransactions.WXDAI.supply.length} WXDAI`);
 
 
   if (gnosisTransactions) {
@@ -455,7 +451,7 @@ function transformTransactionsV3ToFrontendFormat(
       if (gnosisTxs.length > 0 && (tokenSymbol === 'USDC' || tokenSymbol === 'WXDAI')) {
         frontendTransactions[tokenSymbol as keyof FrontendTransactions].supply.push(...gnosisTxs);
 
-        console.log(`➕ ${gnosisTxs.length} transactions GnosisScan ajoutées pour ${tokenSymbol}`);
+        logger.info(`${gnosisTxs.length} transactions GnosisScan ajoutées pour ${tokenSymbol}`);
       }
     });
 

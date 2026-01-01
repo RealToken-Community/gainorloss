@@ -1,6 +1,7 @@
 import { fetchAllTokenBalances } from './graphql';
 import { fetchSupplyTokenTransactionsViaGnosisScan } from './gnosisscan';
 import { fetchAllTransactionsV3, transformTransactionsV3ToFrontendFormat } from './fetch-transactions';
+import logger from '../../utils/logger';
 
 /**
  * Configuration depuis les variables d'environnement
@@ -54,7 +55,7 @@ async function getCurrentBalances(userAddress: string): Promise<any> {
       ]
     }));
     
-    console.log(` Multicall RPC: ${calls.length} tokens`);
+    logger.debug(`Multicall RPC: ${calls.length} tokens`);
     
     const response = await fetch(GNOSIS_RPC_URL, {
       method: 'POST',
@@ -100,13 +101,13 @@ async function getCurrentBalances(userAddress: string): Promise<any> {
     return balances;
 
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération des balances RPC:', error);
+    logger.error('Erreur lors de la récupération des balances RPC:', error);
     return null;
   }
 }
 
 function calculateSupplyInterestFromBalances(atokenBalances: any[], token: string): any {
-  console.log(`💰 Calcul des intérêts de supply pour ${token} via TheGraph`);
+  logger.info(`Calcul des intérêts de supply pour ${token} via TheGraph`);
   
   if (!atokenBalances || atokenBalances.length === 0) {
     return createEmptyResult('supply');
@@ -136,7 +137,7 @@ function calculateSupplyInterestFromBalances(atokenBalances: any[], token: strin
   const periodBalances = Array.from(balancesByDay.values())
     .sort((a: any, b: any) => a.timestamp - b.timestamp);
 
-  console.log(`📅 ${periodBalances.length} jours uniques trouvés (après déduplication)`);
+  logger.debug(`${periodBalances.length} jours uniques trouvés (après déduplication)`);
 
   // Traiter chaque jour
   const dailyDetails: any[] = [];
@@ -202,7 +203,7 @@ function calculateSupplyInterestFromBalances(atokenBalances: any[], token: strin
     currentSupply = currentATokenBalance;
   }
 
-  console.log(`✅ Calcul terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} ${token}`);
+  logger.info(`Calcul terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} ${token}`);
 
   return {
     totalInterest: totalInterest.toString(),
@@ -220,7 +221,7 @@ function calculateSupplyInterestFromBalances(atokenBalances: any[], token: strin
  * Calcule les intérêts pour les debt tokens (vTokens)
  */
 function calculateDebtInterestFromBalances(vtokenBalances: any[], token: string): any {
-  console.log(`💰 Calcul des intérêts de dette pour ${token} via TheGraph`);
+  logger.info(`Calcul des intérêts de dette pour ${token} via TheGraph`);
   
   if (!vtokenBalances || vtokenBalances.length === 0) {
     return createEmptyResult('debt');
@@ -328,7 +329,7 @@ function calculateDebtInterestFromBalances(vtokenBalances: any[], token: string)
     currentDebt = currentVariableDebt;
   }
 
-  console.log(`✅ Calcul terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} ${token}`);
+  logger.info(`Calcul terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} ${token}`);
 
   return {
     totalInterest: totalInterest.toString(),
@@ -346,7 +347,7 @@ function calculateDebtInterestFromBalances(vtokenBalances: any[], token: string)
 async function retrieveInterestAndTransactionsForAllTokens(userAddress: string, req: any = null): Promise<any> {
 
   try {
-    console.log(`🚀 Calcul des intérêts V3 pour ${userAddress} via TheGraph`);
+    logger.info(`Calcul des intérêts V3 pour ${userAddress} via TheGraph`);
     
     // Récupérer les balances pour les calculs d'intérêts
     const allBalances = await fetchAllTokenBalances(userAddress);
@@ -416,7 +417,7 @@ async function retrieveInterestAndTransactionsForAllTokens(userAddress: string, 
     };
     
   } catch (error) {
-    console.error(`❌ Erreur lors du calcul des intérêts TheGraph pour tous les tokens:`, error);
+    logger.error(`Erreur lors du calcul des intérêts TheGraph pour tous les tokens:`, error);
     throw error;
   }
 }
@@ -425,7 +426,7 @@ async function retrieveInterestAndTransactionsForAllTokens(userAddress: string, 
  * Crée un relevé journalier combiné au format YYYYMMDD
  */
 function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token: string): any[] {
-  console.log(`📊 Création du relevé journalier pour ${token}`);
+  logger.debug(`Création du relevé journalier pour ${token}`);
   
   // Combiner tous les détails journaliers
   const allDailyDetails: any[] = [];
@@ -505,7 +506,7 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
   // Convertir en tableau et trier par date
   const statementArray = Object.values(dailyStatement).sort((a: any, b: any) => a.timestamp - b.timestamp);
   
-  console.log(`📊 Relevé journalier créé: ${statementArray.length} jours pour ${token}`);
+  logger.debug(`Relevé journalier créé: ${statementArray.length} jours pour ${token}`);
   
   return statementArray;
 }

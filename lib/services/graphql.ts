@@ -1,4 +1,5 @@
 import { GraphQLClient } from 'graphql-request';
+import logger from '../../utils/logger';
 
 // Configuration TheGraph
 const THEGRAPH_URL = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
@@ -104,14 +105,14 @@ export async function fetchAllATokenBalances(userAddress: string): Promise<Balan
         hasMore = false;
       } else {
         skip += LIMIT;
-        console.log(`⏭️  Pagination suivante2: skip=${skip}`);
+        logger.debug(`Pagination suivante2: skip=${skip}`);
       }
     }
     
     return allBalances;
     
   } catch (error) {  
-    console.error('❌ Erreur lors de la récupération des atoken balances:', error);
+    logger.error('Erreur lors de la récupération des atoken balances:', error);
     throw error;
   }
 }
@@ -150,14 +151,14 @@ export async function fetchAllVTokenBalances(userAddress: string, req: any = nul
         hasMore = false;
       } else {
         skip += LIMIT;
-        console.log(`⏭️  Pagination suivante3: skip=${skip}`);
+        logger.debug(`Pagination suivante3: skip=${skip}`);
       }
     }
     
     return allBalances;
     
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération des vtoken balances:', error);
+    logger.error('Erreur lors de la récupération des vtoken balances:', error);
     throw error;
   }
 }
@@ -171,7 +172,7 @@ export async function fetchAllTokenBalances(userAddress: string): Promise<{
   total: number;
 }> {
   try {
-    console.log(`🚀 Récupération de tous les balances pour ${userAddress}`);
+    logger.info(`Récupération de tous les balances pour ${userAddress}`);
     
     // Récupérer en parallèle pour optimiser
     const [atokenBalances, vtokenBalances] = await Promise.all([
@@ -188,7 +189,7 @@ export async function fetchAllTokenBalances(userAddress: string): Promise<{
     return result;
     
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération de tous les balances:', error);
+    logger.error('Erreur lors de la récupération de tous les balances:', error);
     throw error;
   }
 }
