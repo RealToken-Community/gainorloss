@@ -3,6 +3,7 @@ import { fetchAllTokenBalancesV2 } from './graphql-v2';
 import { fetchAllTransactionsV2, transformTransactionsV2ToFrontendFormat } from './fetch-transactions-v2';
 //  Importer le service GnosisScan
 import { fetchSupplyTokenTransactionsViaGnosisScan } from './gnosisscan';
+import logger from '../../utils/logger';
 
 /**
  * Configuration depuis les variables d'environnement
@@ -49,7 +50,7 @@ async function getCurrentBalancesV2(userAddress: string): Promise<any> {
       ]
     }));
 
-    console.log(` Multicall RPC V2: ${calls.length} tokens`);
+    logger.debug(`Multicall RPC V2: ${calls.length} tokens`);
 
     const response = await fetch(GNOSIS_RPC_URL, {
       method: 'POST',
@@ -94,7 +95,7 @@ async function getCurrentBalancesV2(userAddress: string): Promise<any> {
     return balances;
 
   } catch (error) {
-    console.error('❌ Erreur lors de la récupération des balances RPC V2:', error);
+    logger.error('Erreur lors de la récupération des balances RPC V2:', error);
     return null;
   }
 }
@@ -103,7 +104,7 @@ async function getCurrentBalancesV2(userAddress: string): Promise<any> {
  * Calcule les intérêts pour les supply tokens V2 (rmmWXDAI uniquement)
  */
 function calculateSupplyInterestFromBalancesV2(atokenBalances: any[]): any {
-  console.log(`💰 Calcul des intérêts de supply V2 pour WXDAI via TheGraph`);
+  logger.info(`Calcul des intérêts de supply V2 pour WXDAI via TheGraph`);
 
   if (!atokenBalances || atokenBalances.length === 0) {
     return createEmptyResultV2('supply');
@@ -118,7 +119,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances: any[]): any {
     return createEmptyResultV2('supply');
   }
 
-  console.log(`📊 ${tokenBalances.length} balances atoken V2 trouvées pour WXDAI`);
+  logger.debug(`${tokenBalances.length} balances atoken V2 trouvées pour WXDAI`);
 
   // Trier par timestamp et dédupliquer par jour (garder le dernier)
   const sortedBalances = tokenBalances.sort((a: any, b: any) => a.timestamp - b.timestamp);
@@ -132,7 +133,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances: any[]): any {
   const dailyBalances = Array.from(balancesByDay.values())
     .sort((a: any, b: any) => a.timestamp - b.timestamp);
 
-  console.log(`📅 ${dailyBalances.length} jours uniques trouvés (après déduplication)`);
+  logger.debug(`${dailyBalances.length} jours uniques trouvés (après déduplication)`);
 
   // Traiter chaque jour
   const dailyDetails: any[] = [];
@@ -204,7 +205,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances: any[]): any {
     currentSupply = currentATokenBalance;
   }
 
-  console.log(`✅ Calcul V2 terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} WXDAI`);
+  logger.info(`Calcul V2 terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} WXDAI`);
 
   return {
     totalInterest: totalInterest.toString(),
@@ -222,7 +223,7 @@ function calculateSupplyInterestFromBalancesV2(atokenBalances: any[]): any {
  * Calcule les intérêts pour les debt tokens V2 (debtWXDAI uniquement)
  */
 function calculateDebtInterestFromBalancesV2(vtokenBalances: any[]): any {
-  console.log(`💰 Calcul des intérêts de dette V2 pour WXDAI via TheGraph`);
+  logger.info(`Calcul des intérêts de dette V2 pour WXDAI via TheGraph`);
 
   if (!vtokenBalances || vtokenBalances.length === 0) {
     return createEmptyResultV2('debt');
@@ -237,7 +238,7 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances: any[]): any {
     return createEmptyResultV2('debt');
   }
 
-  console.log(`📊 ${tokenBalances.length} balances vtoken V2 trouvées pour WXDAI`);
+  logger.debug(`${tokenBalances.length} balances vtoken V2 trouvées pour WXDAI`);
 
   // Trier par timestamp et dédupliquer par jour (garder le dernier)
   const sortedBalances = tokenBalances.sort((a: any, b: any) => a.timestamp - b.timestamp);
@@ -332,7 +333,7 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances: any[]): any {
     currentDebt = currentVariableDebt;
   }
 
-  console.log(`✅ Calcul V2 terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} WXDAI`);
+  logger.info(`Calcul V2 terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} WXDAI`);
 
   return {
     totalInterest: totalInterest.toString(),
@@ -347,7 +348,7 @@ function calculateDebtInterestFromBalancesV2(vtokenBalances: any[]): any {
 }
 
 async function retrieveInterestAndTransactionsForAllTokensV2(userAddress: string, req: any = null): Promise<any> {
-  console.log(`🚀 Calcul des intérêts V2 pour WXDAI via TheGraph`);
+    logger.info(`Calcul des intérêts V2 pour WXDAI via TheGraph`);
 
   try {
     // Récupérer tous les balances depuis TheGraph V2
@@ -420,7 +421,7 @@ async function retrieveInterestAndTransactionsForAllTokensV2(userAddress: string
 
   } catch (error) {
 
-    console.error(`❌ Erreur lors du calcul des intérêts V2 TheGraph:`, error);
+    logger.error(`Erreur lors du calcul des intérêts V2 TheGraph:`, error);
     throw error;
   }
 }
@@ -429,7 +430,7 @@ async function retrieveInterestAndTransactionsForAllTokensV2(userAddress: string
  * Crée un relevé journalier combiné V2 au format YYYYMMDD
  */
 function createDailyStatementV2(borrowDetails: any[], supplyDetails: any[]): any[] {
-  console.log(`📊 Création du relevé journalier V2 pour WXDAI`);
+  logger.debug(`Création du relevé journalier V2 pour WXDAI`);
 
   // Combiner tous les détails journaliers
   const allDailyDetails: any[] = [];
@@ -509,7 +510,7 @@ function createDailyStatementV2(borrowDetails: any[], supplyDetails: any[]): any
   // Convertir en tableau et trier par date
   const statementArray = Object.values(dailyStatement).sort((a: any, b: any) => a.timestamp - b.timestamp);
 
-  console.log(`📊 Relevé journalier V2 créé: ${statementArray.length} jours pour WXDAI`);
+  logger.debug(`Relevé journalier V2 créé: ${statementArray.length} jours pour WXDAI`);
 
   return statementArray;
 }

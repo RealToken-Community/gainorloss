@@ -5,6 +5,7 @@ import Chart from '../components/Chart';
 import TransactionsTable from '../components/TransactionsTable';
 import FinancialSummary from '../components/FinancialSummary';
 import FiltersBar from '../components/FiltersBar';
+import logger from '../utils/logger';
 
 // Types pour les données de l'API V3
 interface DailyDetail {
@@ -461,9 +462,31 @@ export default function Home() {
       return;
     }
 
-    // Validation basique de l'adresse EVM
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address.trim())) {
-      alert('Adresse EVM invalide (format: 0x...)');
+    // Validation de l'adresse EVM avec vérification du checksum EIP-55
+    try {
+      const { isAddress, getAddress } = await import('ethers');
+      const trimmedAddress = address.trim();
+      
+      if (!isAddress(trimmedAddress)) {
+        alert('Adresse EVM invalide (format: 0x...)');
+        return;
+      }
+      
+      // Normaliser l'adresse avec le bon checksum EIP-55
+      const normalizedAddress = getAddress(trimmedAddress);
+      
+      // Vérifier si l'adresse fournie avait le bon checksum
+      // Si l'adresse originale n'est pas identique à la normalisée, le checksum était incorrect
+      if (trimmedAddress !== normalizedAddress && trimmedAddress.toLowerCase() !== normalizedAddress.toLowerCase()) {
+        // L'adresse était valide mais avec un mauvais checksum - on normalise silencieusement
+        // mais on pourrait aussi informer l'utilisateur pour des raisons de sécurité
+        logger.warn(`Adresse normalisée (checksum corrigé): ${trimmedAddress} → ${normalizedAddress}`);
+      }
+      
+      setAddress(normalizedAddress);
+    } catch (error) {
+      logger.error('Erreur lors de la validation de l\'adresse:', error);
+      alert('Erreur lors de la validation de l\'adresse');
       return;
     }
 
@@ -472,38 +495,38 @@ export default function Home() {
     setData(null);
 
     try {
-      // Utiliser les routes API internes Next.js
-      const apiUrl = `/api/rmm/v3/${address.trim()}`;
-      console.log('🚀 Appel API vers:', apiUrl);
+      // Utiliser les routes API internes Next.js avec l'adresse normalisée
+      const apiUrl = `/api/rmm/v3/${normalizedAddress}`;
+      logger.debug('Appel API vers:', apiUrl);
       
       const response = await fetch(apiUrl);
-      console.log('📡 Réponse API:', response.status, response.statusText);
+      logger.debug('Réponse API:', response.status, response.statusText);
       
       if (!response.ok) {
         throw new Error(`Erreur API: ${response.status} ${response.statusText}`);
       }
       
       const result = await response.json();
-      console.log('✅ Données reçues:', result);
+      logger.debug('Données reçues:', result);
       setData(result);
       
       // Récupérer les données RMM v2
-      console.log('🔄 Récupération des données RMM v2...');
+      logger.debug('Récupération des données RMM v2...');
       try {
-        const v2Response = await fetch(`/api/rmm/v2/${address.trim()}`);
+        const v2Response = await fetch(`/api/rmm/v2/${normalizedAddress}`);
         if (v2Response.ok) {
           const v2Result = await v2Response.json();
-          console.log('✅ Données RMM v2 reçues:', v2Result);
+          logger.debug('Données RMM v2 reçues:', v2Result);
           setDataV2(v2Result);
         } else {
-          console.log('⚠️ Erreur lors de la récupération des données RMM v2');
+          logger.warn('Erreur lors de la récupération des données RMM v2');
         }
       } catch (v2Error) {
-        console.log('⚠️ Erreur lors de la récupération des données RMM v2:', v2Error);
+        logger.warn('Erreur lors de la récupération des données RMM v2:', v2Error);
       }
 
     } catch (err) {
-      console.error('❌ Erreur lors de la récupération des données:', err);
+      logger.error('Erreur lors de la récupération des données:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);

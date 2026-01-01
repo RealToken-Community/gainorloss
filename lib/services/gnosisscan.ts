@@ -1,5 +1,5 @@
-import fetch from 'node-fetch';
 import { TOKENS } from '../../utils/constants';
+import logger from '../../utils/logger';
 
 // Configuration Gnosisscan
 const GNOSISSCAN_API_URL = 'https://api.etherscan.io/v2/api';
@@ -76,12 +76,12 @@ async function fetchAllTokenTransactions(
         if (transactionCount < 1000) {
           hasMoreData = false;
         } else {
-          console.log(`🔄 Plus de données disponibles, page suivante...`);
+          logger.debug(`Plus de données disponibles, page suivante...`);
           currentPage++;
           
           // RESPECTER LA LIMITE D'API: attendre 500ms
           if (currentPage > 1) {
-            console.log(`⏱️  Attente ${DELAY_BETWEEN_REQUESTS}ms pour respecter la limite d'API...`);
+            logger.debug(`Attente ${DELAY_BETWEEN_REQUESTS}ms pour respecter la limite d'API...`);
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_REQUESTS));
           }
         }
@@ -93,36 +93,36 @@ async function fetchAllTokenTransactions(
         
         if (isNoTransactions) {
           // Cas normal : l'utilisateur n'a simplement pas de transactions
-          console.log(`ℹ️  Aucune transaction trouvée pour ${tokenAddress} (cas normal)`);
+          logger.info(`Aucune transaction trouvée pour ${tokenAddress} (cas normal)`);
           hasMoreData = false; // Arrêter la boucle, retourner un tableau vide
         } else if (message.toLowerCase().includes('rate limit')) {
           // Vraie erreur : limite d'API atteinte
-          console.error(`❌ Limite d'API GnosisScan atteinte: ${message}`);
+          logger.error(`Limite d'API GnosisScan atteinte: ${message}`);
           throw new Error(`Limite d'API GnosisScan atteinte: ${message}`);
         } else if (message) {
           // Autre erreur de l'API
-          console.error(`❌ Erreur API GnosisScan: ${message}`);
+          logger.error(`Erreur API GnosisScan: ${message}`);
           throw new Error(`Erreur API GnosisScan: ${message}`);
         } else {
           // Réponse invalide
-          console.error(`❌ Réponse API GnosisScan invalide:`, data);
+          logger.error(`Réponse API GnosisScan invalide:`, data);
           throw new Error('Réponse API GnosisScan invalide');
         }
       } else {
         // Réponse inattendue
-        console.error(`❌ Réponse API GnosisScan inattendue:`, data);
+        logger.error(`Réponse API GnosisScan inattendue:`, data);
         throw new Error('Réponse API GnosisScan inattendue');
       }
     }
     
     if (totalTransactions > 0) {
-      console.log(`✅ ${totalTransactions} transaction(s) récupérée(s) pour ${tokenAddress}`);
+      logger.info(`${totalTransactions} transaction(s) récupérée(s) pour ${tokenAddress}`);
     }
     
     return allTransactions;
     
   } catch (error) { 
-    console.error(`❌ Erreur lors de la récupération des transactions de token ${tokenAddress}:`, error);
+    logger.error(`Erreur lors de la récupération des transactions de token ${tokenAddress}:`, error);
     throw error;
   }
 }
@@ -156,8 +156,8 @@ async function fetchTokenTransactionsByVersion(
     
     const range = blockRanges[version] || blockRanges['V3'];
     
-    console.log(`🚀 Récupération des transactions ${version} pour ${tokenAddress}`);
-    console.log(`📊 Blocs: ${range.startBlock} → ${range.endBlock}`);
+    logger.info(`Récupération des transactions ${version} pour ${tokenAddress}`);
+    logger.debug(`Blocs: ${range.startBlock} → ${range.endBlock}`);
     
     return await fetchAllTokenTransactions(
       userAddress, 
@@ -168,7 +168,7 @@ async function fetchTokenTransactionsByVersion(
     );
     
   } catch (error) {
-    console.error(`❌ Erreur lors de la récupération des transactions ${version}:`, error);
+    logger.error(`Erreur lors de la récupération des transactions ${version}:`, error);
     throw error;
   }
 }
@@ -209,7 +209,7 @@ async function fetchSupplyTokenTransactionsFromAPI(userAddress: string, version:
       allRawTransactions[tokenSymbol] = rawTransactions;
       
     } catch (error) {
-      console.error(`❌ Erreur lors de la récupération des transactions ${tokenSymbol}:`, error);
+      logger.error(`Erreur lors de la récupération des transactions ${tokenSymbol}:`, error);
       allRawTransactions[tokenSymbol] = [];
     }
     
@@ -350,7 +350,7 @@ async function fetchSupplyTokenTransactionsViaGnosisScan(
     return allFormattedTransactions;
     
   } catch (error) {  
-    console.error(`❌ Erreur lors de la récupération des transactions supply ${version}:`, error);
+    logger.error(`Erreur lors de la récupération des transactions supply ${version}:`, error);
     throw error;
   }
 }
