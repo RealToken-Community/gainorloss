@@ -462,6 +462,9 @@ export default function Home() {
       return;
     }
 
+    // Déclarer normalizedAddress avant le bloc try pour qu'elle soit accessible après
+    let normalizedAddress: string;
+    
     // Validation de l'adresse EVM avec vérification du checksum EIP-55
     try {
       const { isAddress, getAddress } = await import('ethers');
@@ -473,7 +476,7 @@ export default function Home() {
       }
       
       // Normaliser l'adresse avec le bon checksum EIP-55
-      const normalizedAddress = getAddress(trimmedAddress);
+      normalizedAddress = getAddress(trimmedAddress);
       
       // Vérifier si l'adresse fournie avait le bon checksum
       // Si l'adresse originale n'est pas identique à la normalisée, le checksum était incorrect
