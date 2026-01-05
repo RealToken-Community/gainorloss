@@ -75,7 +75,7 @@ async function getCurrentBalancesV2(userAddress: string): Promise<any> {
 
       if (result && result.result) {
         const hexBalance = result.result;
-        const decimalBalance = parseInt(hexBalance, 16).toString();
+        const decimalBalance = BigInt(hexBalance).toString();
 
         balances[key] = {
           token: token.address,
