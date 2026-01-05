@@ -11,6 +11,7 @@ import {
   AreaChart
 } from 'recharts';
 import MagnetLink from './MagnetLink';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ChartData {
   date: string;
@@ -39,14 +40,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const data = dataPoint.payload;
     
     return (
-      <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-        <p className="text-sm text-gray-600 mb-1">{label}</p>
-        <p className="text-lg font-semibold text-gray-900">
+      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{label}</p>
+        <p className="text-lg font-semibold text-gray-900 dark:text-white">
           {value.toFixed(2)}
         </p>
         {/* Afficher des informations supplémentaires si disponibles */}
         {data && data.type && (
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             Type: {data.type} | Montant: {data.amount?.toFixed(2) || 'N/A'}
           </p>
         )}
@@ -66,6 +67,11 @@ const Chart: React.FC<ChartProps> = ({
   tokenAddress,
   userAddress,
 }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+  const gridColor = isDark ? '#374151' : '#f0f0f0';
+  const axisColor = isDark ? '#9ca3af' : '#6b7280';
+  
   // Vérifier si toutes les valeurs sont à 0 (ou très proches de 0)
   // Cela inclut le cas d'un seul point à 0 ou plusieurs points tous à 0
   const allValuesZero = data && data.length > 0 && data.every(point => Math.abs(point.value) < 0.0001);
@@ -73,10 +79,10 @@ const Chart: React.FC<ChartProps> = ({
   // Cas 1: Aucune donnée
   if (!data || data.length === 0) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
             {tokenAddress && userAddress && (
               <MagnetLink 
                 tokenAddress={tokenAddress} 
@@ -86,14 +92,14 @@ const Chart: React.FC<ChartProps> = ({
             )}
           </div>
           {currentBalance && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Balance actuelle: <span className="font-semibold" style={{ color }}>{currentBalance}</span>
             </div>
           )}
         </div>
         <div className="text-center py-12">
-          <div className="text-gray-400 text-4xl mb-4">📊</div>
-          <p className="text-gray-600 text-sm">Never used</p>
+          <div className="text-gray-400 dark:text-gray-500 text-4xl mb-4">📊</div>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">Never used</p>
         </div>
       </div>
     );
@@ -102,10 +108,10 @@ const Chart: React.FC<ChartProps> = ({
   // Cas 2: Données filtrées mais toutes à 0 (ou un seul point à 0)
   if (allValuesZero) {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
             {tokenAddress && userAddress && (
               <MagnetLink 
                 tokenAddress={tokenAddress} 
@@ -115,24 +121,24 @@ const Chart: React.FC<ChartProps> = ({
             )}
           </div>
           {currentBalance && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Balance actuelle: <span className="font-semibold" style={{ color }}>{currentBalance}</span>
             </div>
           )}
         </div>
         <div className="text-center py-12">
-          <div className="text-gray-400 text-4xl mb-4">📅</div>
-          <p className="text-gray-600 text-sm">Not used in this period</p>
+          <div className="text-gray-400 dark:text-gray-500 text-4xl mb-4">📅</div>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">Not used in this period</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <h3 className="text-xl font-bold text-gray-900">{title}</h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
           {tokenAddress && userAddress && (
             <MagnetLink 
               tokenAddress={tokenAddress} 
@@ -142,7 +148,7 @@ const Chart: React.FC<ChartProps> = ({
           )}
         </div>
         {currentBalance && (
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
             Balance actuelle: <span className="font-semibold" style={{ color }}>{currentBalance}</span>
           </div>
         )}
@@ -158,19 +164,21 @@ const Chart: React.FC<ChartProps> = ({
                   <stop offset="95%" stopColor={color} stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis 
                 dataKey="formattedDate" 
-                stroke="#6b7280"
+                stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: axisColor }}
               />
               <YAxis 
-                stroke="#6b7280"
+                stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: axisColor }}
                 tickFormatter={(value) => {
                   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
@@ -190,19 +198,21 @@ const Chart: React.FC<ChartProps> = ({
             </AreaChart>
           ) : (
             <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
               <XAxis 
                 dataKey="formattedDate" 
-                stroke="#6b7280"
+                stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: axisColor }}
               />
               <YAxis 
-                stroke="#6b7280"
+                stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
+                tick={{ fill: axisColor }}
                 tickFormatter={(value) => {
                   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
                   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
