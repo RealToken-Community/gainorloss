@@ -185,14 +185,14 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 lg:p-8">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{title}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
           {onToggleCollapse && (
             <button
               onClick={onToggleCollapse}
-              className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
               aria-label={isCollapsed ? "Scroll" : "Unscroll"}
             >
               {isCollapsed ? (
@@ -210,7 +210,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
         
         <div className="flex flex-col lg:flex-row gap-4">
           {isCollapsed && (
-            <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-sm text-gray-600">
+            <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-sm text-gray-600 dark:text-gray-400">
               <span>Total: {filteredTransactions.length}</span>
               <span>Borrow: {filteredTransactions.filter(tx => tx.type === 'borrow').length}</span>
               <span>Repay: {filteredTransactions.filter(tx => tx.type === 'repay').length}</span>
@@ -227,7 +227,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-2">
                 <div className="flex flex-col sm:flex-row gap-2">
                   {/* Sélection multiple des types de transactions (local) */}
-                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white min-w-[200px]">
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 min-w-[200px]">
                     {([
                       { value: 'all', label: 'All', icon: '📊' },
                       { value: 'borrow', label: 'Borrow', icon: '🤝' },
@@ -244,8 +244,8 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                         onClick={() => handleTypeToggle(value)}
                         className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
                           selectedTypes.has(value)
-                            ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                            : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-700'
+                            : 'bg-gray-50 dark:bg-gray-600 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-500'
                         }`}
                       >
                         <span>{icon}</span>
@@ -261,7 +261,7 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                       setSelectedTypes(new Set(['all']));
                       setHashSearch('');
                     }}
-                    className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    className="px-3 py-2 bg-gray-500 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
                   >
                     🔄 Reset Filters
                   </button>
@@ -276,55 +276,55 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
             {/* Colonne 1: Total */}
-            <div className="bg-blue-50 border border-blue-100 p-3 sm:p-4 rounded-xl">
-              <h3 className="text-xs sm:text-sm font-medium text-blue-700 mb-1">Total</h3>
-              <p className="text-lg sm:text-2xl font-bold text-blue-600">{filteredTransactions.length}</p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 p-3 sm:p-4 rounded-xl">
+              <h3 className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-400 mb-1">Total</h3>
+              <p className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{filteredTransactions.length}</p>
             </div>
             
             {/* Colonne 2: Emprunts */}
-            <div className="bg-red-50 border border-red-100 p-3 sm:p-4 rounded-xl">
-              <h3 className="text-xs sm:text-sm font-medium text-red-700 mb-1">Borrow</h3>
-              <p className="text-lg sm:text-2xl font-bold text-red-600">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-3 sm:p-4 rounded-xl">
+              <h3 className="text-xs sm:text-sm font-medium text-red-700 dark:text-red-400 mb-1">Borrow</h3>
+              <p className="text-lg sm:text-2xl font-bold text-red-600 dark:text-red-400">
                 {filteredTransactions.filter(tx => tx.type === 'borrow').length}
               </p>
             </div>
             
             {/* Colonne 3: Remboursements */}
-            <div className="bg-purple-50 border border-purple-100 p-3 sm:p-4 rounded-xl">
-              <h3 className="text-xs sm:text-sm font-medium text-purple-700 mb-1">Repay</h3>
-              <p className="text-lg sm:text-2xl font-bold text-purple-600">
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-900/30 p-3 sm:p-4 rounded-xl">
+              <h3 className="text-xs sm:text-sm font-medium text-purple-700 dark:text-purple-400 mb-1">Repay</h3>
+              <p className="text-lg sm:text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {filteredTransactions.filter(tx => tx.type === 'repay').length}
               </p>
             </div>
             
             {/* Colonne 4: Dépôts */}
-            <div className="bg-green-50 border border-green-100 p-3 sm:p-4 rounded-xl">
-              <h3 className="text-xs sm:text-sm font-medium text-green-700 mb-1">Deposit</h3>
-              <p className="text-lg sm:text-2xl font-bold text-green-600">
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 p-3 sm:p-4 rounded-xl">
+              <h3 className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-400 mb-1">Deposit</h3>
+              <p className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">
                 {filteredTransactions.filter(tx => tx.type === 'deposit').length}
               </p>
             </div>
             
             {/* Colonne 5: Retraits */}
-            <div className="bg-orange-50 border border-orange-100 p-3 sm:p-4 rounded-xl">
-              <h3 className="text-xs sm:text-sm font-medium text-orange-700 mb-1">Withdraw</h3>
-              <p className="text-lg sm:text-2xl font-bold text-orange-600">
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 p-3 sm:p-4 rounded-xl">
+              <h3 className="text-xs sm:text-sm font-medium text-orange-700 dark:text-orange-400 mb-1">Withdraw</h3>
+              <p className="text-lg sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {filteredTransactions.filter(tx => tx.type === 'withdraw').length}
               </p>
             </div>
             
             {/* Colonne 6: Recherche de hash */}
-            <div className="bg-gray-50 border border-gray-100 p-3 sm:p-4 rounded-xl col-span-2 sm:col-span-1">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Search Hash</h3>
+            <div className="bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 p-3 sm:p-4 rounded-xl col-span-2 sm:col-span-1">
+              <h3 className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Search Hash</h3>
               <input
                 type="text"
                 value={hashSearch}
                 onChange={(e) => setHashSearch(e.target.value)}
                 placeholder="0x123..."
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono dark:bg-gray-800 dark:text-white"
               />
               {hashSearch && (
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {filteredTransactions.length} match{filteredTransactions.length !== 1 ? 'es' : ''}
                 </p>
               )}
@@ -334,26 +334,26 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
           <div className="overflow-x-auto">
             <table className="w-full min-w-full">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 text-xs sm:text-sm">Date</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 text-xs sm:text-sm">Type</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 text-xs sm:text-sm">Token</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 text-xs sm:text-sm">Amount</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 text-xs sm:text-sm">Hash</th>
-                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 text-xs sm:text-sm">Version</th>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">Date</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">Type</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">Token</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">Amount</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">Hash</th>
+                  <th className="text-left py-3 px-2 sm:px-4 font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">Version</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500 text-sm">
+                    <td colSpan={6} className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
                       No transaction found with the current filters
                     </td>
                   </tr>
                 ) : (
                   filteredTransactions.map((tx, index) => (
-                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600">
+                    <tr key={index} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {formatDate(tx.timestamp)}
                       </td>
                       <td className="py-3 px-2 sm:px-4">
@@ -361,10 +361,10 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                           {getTransactionIcon(tx.type)} {tx.type}
                         </span>
                       </td>
-                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600">
+                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {tx.token}
                       </td>
-                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-900">
+                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
                         {formatAmount(tx.amount, tx.token === 'USDC' ? 6 : 18).toFixed(2)} {tx.token}
                       </td>
                       <td className="py-3 px-2 sm:px-4">
@@ -373,19 +373,19 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                             href={`https://gnosisscan.io/tx/${tx.txHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-mono truncate block max-w-xs"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs sm:text-sm font-mono truncate block max-w-xs"
                           >
                             {tx.txHash.slice(0, 8)}...{tx.txHash.slice(-6)}
                           </a>
                         ) : (
-                          <span className="text-gray-400 text-xs sm:text-sm">Hash not available</span>
+                          <span className="text-gray-400 dark:text-gray-500 text-xs sm:text-sm">Hash not available</span>
                         )}
                       </td>
-                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600">
+                      <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          tx.version === 'V2' ? 'bg-blue-100 text-blue-700' : 
-                          tx.version === 'V3' ? 'bg-green-100 text-green-700' : 
-                          'bg-gray-100 text-gray-600'
+                          tx.version === 'V2' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 
+                          tx.version === 'V3' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 
+                          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                         }`}>
                           {tx.version || 'N/A'}
                         </span>

@@ -551,11 +551,11 @@ export default function Home() {
         <Head>
           <title>RMM Analytics - Analysis in progress</title>
         </Head>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center max-w-md">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 border-t-blue-500 mx-auto mb-6"></div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Analysis in progress</h2>
-            <p className="text-gray-600 text-sm">RMM data recovery for {address}</p>
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-12 text-center max-w-md">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-gray-200 dark:border-gray-700 border-t-blue-500 mx-auto mb-6"></div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Analysis in progress</h2>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">RMM data recovery for {address}</p>
           </div>
         </div>
       </>
@@ -595,7 +595,7 @@ export default function Home() {
           <title>RMM Analytics</title>
         </Head>
 
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
           {/* Barre de filtres fixe en haut */}
           <FiltersBar
             selectedTokens={selectedTokens}
@@ -626,35 +626,35 @@ export default function Home() {
 
             {/* Erreur */}
             {error && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-8">
                 <div className="text-center">
                   <div className="text-red-500 text-6xl mb-4">⚠️</div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">Erreur</h2>
-                  <p className="text-gray-600">{error}</p>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Erreur</h2>
+                  <p className="text-gray-600 dark:text-gray-400">{error}</p>
                 </div>
               </div>
             )}
 
             
             {usdcData && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">USDC Summary</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-8">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">USDC Summary</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-red-50 border border-red-100 p-6 rounded-xl">
-                    <h3 className="text-sm font-medium text-red-700 mb-2">Borrow Interest</h3>
-                    <p className="text-3xl font-bold text-red-600">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-6 rounded-xl">
+                    <h3 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">Borrow Interest</h3>
+                    <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                       {formatAmount(usdcTotalDebtInterest.toString()).toFixed(2)} USDC
                     </p>
                   </div>
-                  <div className="bg-green-50 border border-green-100 p-6 rounded-xl">
-                    <h3 className="text-sm font-medium text-green-700 mb-2">Supply Interest</h3>
-                    <p className="text-3xl font-bold text-green-600">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 p-6 rounded-xl">
+                    <h3 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Supply Interest</h3>
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                       {formatAmount(usdcTotalSupplyInterest.toString()).toFixed(2)} USDC
                     </p>
                   </div>
-                  <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
-                    <h3 className="text-sm font-medium text-blue-700 mb-2">PnL Net</h3>
-                    <p className={`text-3xl font-bold ${usdcNetInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 p-6 rounded-xl">
+                    <h3 className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">PnL Net</h3>
+                    <p className={`text-3xl font-bold ${usdcNetInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {formatAmount(usdcNetInterest.toString()).toFixed(2)} USDC
                     </p>
                   </div>
@@ -687,24 +687,24 @@ export default function Home() {
 
             {/* WXDAI Summary */}
             {wxdaiData && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">WXDAI Summary</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-8">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">WXDAI Summary</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-red-50 border border-red-100 p-6 rounded-xl">
-                    <h3 className="text-sm font-medium text-red-700 mb-2">Borrow Interest</h3>
-                    <p className="text-3xl font-bold text-red-600">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-6 rounded-xl">
+                    <h3 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">Borrow Interest</h3>
+                    <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                       {formatAmount(wxdaiTotalDebtInterest.toString(), 18).toFixed(2)} WXDAI
                     </p>
                   </div>
-                  <div className="bg-green-50 border border-green-100 p-6 rounded-xl">
-                    <h3 className="text-sm font-medium text-green-700 mb-2">Supply Interest</h3>
-                    <p className="text-3xl font-bold text-green-600">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 p-6 rounded-xl">
+                    <h3 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Supply Interest</h3>
+                    <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                       {formatAmount(wxdaiTotalSupplyInterest.toString(), 18).toFixed(2)} WXDAI
                     </p>
                   </div>
-                  <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
-                    <h3 className="text-sm font-medium text-blue-700 mb-2">PnL Net</h3>
-                    <p className={`text-3xl font-bold ${wxdaiNetInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 p-6 rounded-xl">
+                    <h3 className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">PnL Net</h3>
+                    <p className={`text-3xl font-bold ${wxdaiNetInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {formatAmount(wxdaiNetInterest.toString(), 18).toFixed(2)} WXDAI
                     </p>
                   </div>
@@ -739,13 +739,13 @@ export default function Home() {
             {dataV2 && (
               <>
                
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6">RMM v2 Transactions</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">RMM v2 Transactions</h2>
                   
                   {/* Vérifier si le wallet a des données V2 */}
                   {!dataV2.data?.results?.[0]?.data?.interests?.WXDAI ? (
                     <div className="text-center py-12">
                       <div className="text-6xl mb-4">😢</div>
-                      <p className="text-lg text-gray-600">
+                      <p className="text-lg text-gray-600 dark:text-gray-400">
                         This wallet is too young and has never known the V2 :&apos;(
                       </p>
                     </div>
@@ -760,24 +760,24 @@ export default function Home() {
                         
                         return (
                           <>
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
-                              <h2 className="text-2xl font-bold text-gray-900 mb-6">WXDAI Summary (V2)</h2>
+                            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-8">
+                              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">WXDAI Summary (V2)</h2>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-red-50 border border-red-100 p-6 rounded-xl">
-                                  <h3 className="text-sm font-medium text-red-700 mb-2">Borrow Interest</h3>
-                                  <p className="text-3xl font-bold text-red-600">
+                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-6 rounded-xl">
+                                  <h3 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">Borrow Interest</h3>
+                                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                                     {formatAmount(v2WxdaiData.borrow.totalInterest.toString(), 18).toFixed(2)} WXDAI
                                   </p>
                                 </div>
-                                <div className="bg-green-50 border border-green-100 p-6 rounded-xl">
-                                  <h3 className="text-sm font-medium text-green-700 mb-2">Supply Interest</h3>
-                                  <p className="text-3xl font-bold text-green-600">
+                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 p-6 rounded-xl">
+                                  <h3 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">Supply Interest</h3>
+                                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                                     {formatAmount(v2WxdaiData.supply.totalInterest.toString(), 18).toFixed(2)} WXDAI
                                   </p>
                                 </div>
-                                <div className="bg-blue-50 border border-blue-100 p-6 rounded-xl">
-                                  <h3 className="text-sm font-medium text-blue-700 mb-2">PnL Net</h3>
-                                  <p className={`text-3xl font-bold ${(parseFloat(v2WxdaiData.supply.totalInterest) - parseFloat(v2WxdaiData.borrow.totalInterest)) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 p-6 rounded-xl">
+                                  <h3 className="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">PnL Net</h3>
+                                  <p className={`text-3xl font-bold ${(parseFloat(v2WxdaiData.supply.totalInterest) - parseFloat(v2WxdaiData.borrow.totalInterest)) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                     {formatAmount((parseFloat(v2WxdaiData.supply.totalInterest) - parseFloat(v2WxdaiData.borrow.totalInterest)).toString(), 18).toFixed(2)} WXDAI
                                   </p>
                                 </div>
@@ -817,10 +817,10 @@ export default function Home() {
 
             {/* Aucune donnée */}
             {data?.data.results.length === 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-                <div className="text-gray-400 text-6xl mb-4">📊</div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">No data</h2>
-                <p className="text-gray-600">No RMM transaction found for this address</p>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 text-center">
+                <div className="text-gray-400 dark:text-gray-500 text-6xl mb-4">📊</div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No data</h2>
+                <p className="text-gray-600 dark:text-gray-400">No RMM transaction found for this address</p>
               </div>
             )}
 
@@ -851,14 +851,14 @@ export default function Home() {
         <meta name="description" content="Analyze your RMM earnings and losses" />
       </Head>
 
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 w-full max-w-md">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-12 w-full max-w-md">
           {/* En-tête */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-3">
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">
               RMM Analytics
             </h1>
-            <p className="text-gray-600 text-lg">
+            <p className="text-gray-600 dark:text-gray-400 text-lg">
             Analyze your RMM earnings and losses
             </p>
           </div>
@@ -866,7 +866,7 @@ export default function Home() {
           {/* Formulaire */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-3">
+              <label htmlFor="address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                 EVM address
               </label>
               <input
@@ -875,22 +875,22 @@ export default function Home() {
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="0x3f3994bb23c48204ddeb99aa6bf6dd275abf7a3f"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-gray-900"
+                className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors text-gray-900 dark:text-white dark:bg-gray-700"
               />
             </div>
 
             <button
               type="submit"
               disabled={!address.trim()}
-              className="w-full bg-gray-900 text-white py-4 px-6 rounded-xl font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full bg-gray-900 dark:bg-gray-700 text-white py-4 px-6 rounded-xl font-medium hover:bg-gray-800 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Analyze
             </button>
           </form>
 
           {/* Note */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-            <p className="text-sm text-blue-800">
+          <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-xl">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
               💡 <strong>Info:</strong> Enter your EVM address to view your RMM transactions and calculate your earnigns/losses
             </p>
           </div>

@@ -23,13 +23,13 @@ const MagnetLink: React.FC<MagnetLinkProps> = ({ tokenAddress, userAddress, clas
     <button
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className={`inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors duration-200 border border-blue-300 ${className}`}
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors duration-200 border border-blue-300 dark:border-blue-700 ${className}`}
       aria-label={`Voir les transactions sur GnosisScan pour ${tokenAddress}`}
       title={`Voir les transactions sur GnosisScan pour ${tokenAddress}`}
       tabIndex={0}
     >
       <svg
-        className="w-4 h-4 text-blue-600"
+        className="w-4 h-4 text-blue-600 dark:text-blue-400"
         fill="currentColor"
         viewBox="0 0 24 24"
         xmlns="http://www.w3.org/2000/svg"

@@ -428,11 +428,11 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 mb-8">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8 mb-8">
       {/*  HEADER: Responsive avec flex-col sur mobile, flex-row sur desktop */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Financial Summary</h2>
-        <p className="text-sm text-gray-600">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Financial Summary</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Period analyzed from {new Date(dateRange.start).toLocaleDateString('fr-CH')} to {new Date(dateRange.end).toLocaleDateString('fr-CH')}
         </p>
       </div>
@@ -441,34 +441,34 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
       <div className="overflow-x-auto mb-6">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-4 font-semibold text-gray-900">Token</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-900">Version</th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-900">
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Token</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Version</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
                 Debt Interest
                 <a 
                   href={`https://gnosisscan.io/token/${TOKENS.USDC.debtAddress}?a=${userAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-2 text-blue-600 hover:text-blue-800"
+                  className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                   title="Voir l'historique sur GnosisScan"
                 >
                   
                 </a>
               </th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-900">
+              <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">
                 Supply Interest
                 <a 
                   href={`https://gnosisscan.io/token/${TOKENS.USDC.supplyAddress}?a=${userAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-2 text-blue-600 hover:text-blue-800"
+                  className="ml-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                   title="Voir l'historique sur GnosisScan"
                 >
                   
                 </a>
               </th>
-              <th className="text-left py-3 px-4 font-semibold text-gray-900">Net Interest</th>
+              <th className="text-left py-3 px-4 font-semibold text-gray-900 dark:text-white">Net Interest</th>
             </tr>
           </thead>
           <tbody>
@@ -477,23 +477,23 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
               const displayToken = tokenKey === 'WXDAI_V2' ? 'WXDAI' : tokenKey;
               
               return (
-                <tr key={tokenKey} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm font-medium text-gray-900">{displayToken}</td>
+                <tr key={tokenKey} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-white">{displayToken}</td>
                   <td className="py-3 px-4">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      data.version === 'V2' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                      data.version === 'V2' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                     }`}>
                       {data.version}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-sm font-medium text-red-600">
+                  <td className="py-3 px-4 text-sm font-medium text-red-600 dark:text-red-400">
                     {data.debt.toFixed(2)} {tokenKey.includes('USDC') ? 'USDC' : 'WXDAI'}
                   </td>
-                  <td className="py-3 px-4 text-sm font-medium text-green-600">
+                  <td className="py-3 px-4 text-sm font-medium text-green-600 dark:text-green-400">
                     {data.supply.toFixed(2)} {tokenKey.includes('USDC') ? 'USDC' : 'WXDAI'}
                   </td>
                   <td className="py-3 px-4 text-sm font-medium">
-                    <span className={data.net >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <span className={data.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                       {data.net.toFixed(2)} {tokenKey.includes('USDC') ? 'USDC' : 'WXDAI'}
                     </span>
                   </td>
@@ -502,17 +502,17 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
             })}
             
             {/* Ligne des totaux */}
-            <tr className="border-t-2 border-gray-200 bg-gray-50">
-              <td className="py-3 px-4 font-semibold text-gray-900">TOTAL</td>
-              <td className="py-3 px-4 text-sm text-gray-600">-</td>
-              <td className="py-3 px-4 font-semibold text-red-600">
+            <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+              <td className="py-3 px-4 font-semibold text-gray-900 dark:text-white">TOTAL</td>
+              <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-400">-</td>
+              <td className="py-3 px-4 font-semibold text-red-600 dark:text-red-400">
                 {totals.debt.toFixed(2)} USD
               </td>
-              <td className="py-3 px-4 font-semibold text-green-600">
+              <td className="py-3 px-4 font-semibold text-green-600 dark:text-green-400">
                 {totals.supply.toFixed(2)} USD
               </td>
               <td className="py-3 px-4 font-semibold">
-                <span className={totals.net >= 0 ? 'text-green-600' : 'text-red-600'}>
+                <span className={totals.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                   {totals.net.toFixed(2)} USD
                 </span>
               </td>
