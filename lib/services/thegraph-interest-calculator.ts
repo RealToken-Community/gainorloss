@@ -54,34 +54,34 @@ async function getCurrentBalances(userAddress: string): Promise<any> {
         "latest"
       ]
     }));
-    
+
     logger.debug(`Multicall RPC: ${calls.length} tokens`);
-    
+
     const response = await fetch(GNOSIS_RPC_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(calls)
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    
+
     if (!Array.isArray(data)) {
       throw new Error('Réponse RPC invalide');
     }
-    
+
     // Traiter les résultats
     const balances: Record<string, any> = {};
     Object.entries(TOKENS_V3).forEach(([key, token]: [string, any], index: number) => {
       const result = data[index];
-      
+
       if (result && result.result) {
         const hexBalance = result.result;
         const decimalBalance = BigInt(hexBalance).toString();
-        
+
         balances[key] = {
           token: token.address,
           symbol: token.symbol,
@@ -97,7 +97,7 @@ async function getCurrentBalances(userAddress: string): Promise<any> {
         };
       }
     });
-    
+
     return balances;
 
   } catch (error) {
@@ -106,241 +106,158 @@ async function getCurrentBalances(userAddress: string): Promise<any> {
   }
 }
 
-function calculateSupplyInterestFromBalances(atokenBalances: any[], token: string): any {
-  logger.info(`Calcul des intérêts de supply pour ${token} via TheGraph`);
-  
-  if (!atokenBalances || atokenBalances.length === 0) {
-    return createEmptyResult('supply');
+/**
+ * Logique de calcul interne factorisée pour supply et debt
+ */
+function calculateInterestInternal(
+  balances: any[],
+  token: string,
+  config: {
+    type: 'supply' | 'debt',
+    balanceField: string,
+    scaledBalanceField: string,
+    increaseLabel: string,
+    decreaseLabel: string
+  }
+): any {
+  const { type, balanceField, scaledBalanceField, increaseLabel, decreaseLabel } = config;
+  logger.info(`Calcul des intérêts de ${type} pour ${token} via TheGraph (Factorisé)`);
+
+  if (!balances || balances.length === 0) {
+    return createEmptyResult(type);
   }
 
   // Filtrer seulement le token demandé
-  const tokenBalances = atokenBalances.filter(balance => 
+  const tokenBalances = balances.filter((balance: any) =>
     balance.userReserve.reserve.symbol === token
   );
 
   if (tokenBalances.length === 0) {
-    return createEmptyResult('supply');
+    return createEmptyResult(type);
   }
-
-
-
 
   // Trier par timestamp et dédupliquer par jour (garder le dernier)
   const sortedBalances = tokenBalances.sort((a: any, b: any) => a.timestamp - b.timestamp);
   const balancesByDay = new Map<string, any>();
-  
+
   sortedBalances.forEach((balance: any) => {
     const dateKey = formatDateYYYYMMDD(balance.timestamp);
-    balancesByDay.set(dateKey, balance); // Le dernier écrase le précédent
+    balancesByDay.set(dateKey, balance);
   });
 
   const periodBalances = Array.from(balancesByDay.values())
     .sort((a: any, b: any) => a.timestamp - b.timestamp);
 
-  logger.debug(`${periodBalances.length} jours uniques trouvés (après déduplication)`);
-
   // Traiter chaque jour
   const dailyDetails: any[] = [];
   let totalInterest = 0n;
-  let currentSupply = 0n;
-  let totalSupplies = 0n;
-  let totalWithdraws = 0n;
+  let currentBalanceWeiValue = 0n;
+  let totalIncreases = 0n;
+  let totalDecreases = 0n;
 
   for (let i = 0; i < periodBalances.length; i++) {
-    const currentBalance = periodBalances[i];
-    const currentATokenBalance = BigInt(currentBalance.currentATokenBalance);
-    const scaledATokenBalance = BigInt(currentBalance.scaledATokenBalance);
-    const currentIndex = BigInt(currentBalance.index);
-    
+    const currentPoint = periodBalances[i];
+    const currentBalance = BigInt(currentPoint[balanceField]);
+    const scaledBalance = BigInt(currentPoint[scaledBalanceField]);
+    const currentIndex = BigInt(currentPoint.index);
+
     let dayTotalInterest = 0n;
-    let daySupply = 0n;
-    let dayWithdraw = 0n;
-    
+    let dayIncrease = 0n;
+    let dayDecrease = 0n;
+
     if (i === 0) {
       dayTotalInterest = 0n;
-    } else {
-      // Jour suivant : comparer avec le jour précédent
-      const previousBalance: any = periodBalances[i - 1];
-      const previousATokenBalance = BigInt(previousBalance.currentATokenBalance);
-      const previousScaledATokenBalance = BigInt(previousBalance.scaledATokenBalance);
-      const previousIndex = BigInt(previousBalance.index);
-      
-      if (scaledATokenBalance > previousScaledATokenBalance) {
-        // Supply : scaled a augmenté
-        const deltaScaled = scaledATokenBalance - previousScaledATokenBalance;
-        const supplyAmountWei = (deltaScaled * currentIndex) / RAY;
-        daySupply = supplyAmountWei;
-        totalSupplies += supplyAmountWei;
-      } else if (scaledATokenBalance < previousScaledATokenBalance) {
-        // Withdraw : scaled a diminué
-        const deltaScaled = previousScaledATokenBalance - scaledATokenBalance;
-        const withdrawAmountWei = (deltaScaled * currentIndex) / RAY;
-        dayWithdraw = withdrawAmountWei;
-        totalWithdraws += withdrawAmountWei;
+      // Si une balance existe au premier snapshot, on la considère comme un mouvement initial
+      if (currentBalance > 0n) {
+        dayIncrease = currentBalance;
+        totalIncreases += currentBalance;
       }
+    } else {
+      const previousPoint: any = periodBalances[i - 1];
+      const previousScaledBalance = BigInt(previousPoint[scaledBalanceField]);
+      const previousIndex = BigInt(previousPoint.index);
+
+      // Identifier le type de mouvement
+      if (scaledBalance > previousScaledBalance) {
+        const deltaScaled = scaledBalance - previousScaledBalance;
+        const increaseAmountWei = (deltaScaled * currentIndex) / RAY;
+        dayIncrease = increaseAmountWei;
+        totalIncreases += increaseAmountWei;
+      } else if (scaledBalance < previousScaledBalance) {
+        const deltaScaled = previousScaledBalance - scaledBalance;
+        const decreaseAmountWei = (deltaScaled * currentIndex) / RAY;
+        dayDecrease = decreaseAmountWei;
+        totalDecreases += decreaseAmountWei;
+      }
+
       // Intérêts = (scaled précédent * (index actuel - index précédent)) / RAY
-      const periodInterest = (previousScaledATokenBalance * (currentIndex - previousIndex)) / RAY;
-      
+      const periodInterest = (previousScaledBalance * (currentIndex - previousIndex)) / RAY;
+
       if (periodInterest > 0n) {
         dayTotalInterest = periodInterest;
       }
     }
-    
-    // Créer le détail journalier
-    const dailyDetail = {
-      date: formatDateYYYYMMDD(currentBalance.timestamp),
-      timestamp: currentBalance.timestamp,
-      supply: currentATokenBalance.toString(),
+
+    // Détail journalier
+    dailyDetails.push({
+      date: formatDateYYYYMMDD(currentPoint.timestamp),
+      timestamp: currentPoint.timestamp,
+      [type]: currentBalance.toString(),
       periodInterest: dayTotalInterest.toString(),
       totalInterest: (totalInterest + dayTotalInterest).toString(),
-      transactionAmount: daySupply > 0n ? daySupply.toString() : (dayWithdraw > 0n ? dayWithdraw.toString() : "0"),
-      transactionType: daySupply > 0n ? 'supply' : (dayWithdraw > 0n ? 'withdraw' : 'none'),
+      transactionAmount: dayIncrease > 0n ? dayIncrease.toString() : (dayDecrease > 0n ? dayDecrease.toString() : "0"),
+      transactionType: dayIncrease > 0n ? increaseLabel : (dayDecrease > 0n ? decreaseLabel : 'none'),
       source: "real"
-    };
-    
-    dailyDetails.push(dailyDetail);
+    });
+
     totalInterest += dayTotalInterest;
-    currentSupply = currentATokenBalance;
+    currentBalanceWeiValue = currentBalance;
   }
 
-  logger.info(`Calcul terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} ${token}`);
+  // Summary avec clés dynamiques
+  const summary: any = {
+    totalInterest: totalInterest.toString(),
+    totalInterestWei: totalInterest.toString(), // pour compatibilité
+  };
+
+  if (type === 'supply') {
+    summary.totalSupplies = totalIncreases.toString();
+    summary.totalWithdraws = totalDecreases.toString();
+    summary.currentSupply = currentBalanceWeiValue.toString();
+  } else {
+    summary.totalBorrows = totalIncreases.toString();
+    summary.totalRepays = totalDecreases.toString();
+    summary.currentDebt = currentBalanceWeiValue.toString();
+  }
 
   return {
     totalInterest: totalInterest.toString(),
     dailyDetails,
-    summary: {
-      totalSupplies: totalSupplies.toString(),
-      totalWithdraws: totalWithdraws.toString(),
-      currentSupply: currentSupply.toString(),
-      totalInterest: totalInterest.toString()
-    }
+    summary
   };
+}
+
+function calculateSupplyInterestFromBalances(atokenBalances: any[], token: string): any {
+  return calculateInterestInternal(atokenBalances, token, {
+    type: 'supply',
+    balanceField: 'currentATokenBalance',
+    scaledBalanceField: 'scaledATokenBalance',
+    increaseLabel: 'supply',
+    decreaseLabel: 'withdraw'
+  });
 }
 
 /**
  * Calcule les intérêts pour les debt tokens (vTokens)
  */
 function calculateDebtInterestFromBalances(vtokenBalances: any[], token: string): any {
-  logger.info(`Calcul des intérêts de dette pour ${token} via TheGraph`);
-  
-  if (!vtokenBalances || vtokenBalances.length === 0) {
-    return createEmptyResult('debt');
-  }
-
-  // Filtrer seulement le token demandé
-  const tokenBalances = vtokenBalances.filter((balance: any) => 
-    balance.userReserve.reserve.symbol === token
-  );
-
-  if (tokenBalances.length === 0) {
-    return createEmptyResult('debt');
-  }
-
-  // Trier par timestamp et dédupliquer par jour (garder le dernier)
-  const sortedBalances = tokenBalances.sort((a: any, b: any) => a.timestamp - b.timestamp);
-  const balancesByDay = new Map<string, any>();
-  
-  sortedBalances.forEach((balance: any) => {
-    const dateKey = formatDateYYYYMMDD(balance.timestamp);
-    balancesByDay.set(dateKey, balance); // Le dernier écrase le précédent
+  return calculateInterestInternal(vtokenBalances, token, {
+    type: 'debt',
+    balanceField: 'currentVariableDebt',
+    scaledBalanceField: 'scaledVariableDebt',
+    increaseLabel: 'borrow',
+    decreaseLabel: 'repay'
   });
-
-  const periodBalances = Array.from(balancesByDay.values())
-    .sort((a: any, b: any) => a.timestamp - b.timestamp);
-
-  // Traiter chaque jour
-  const dailyDetails: any[] = [];
-  let totalInterest = 0n;
-  let currentDebt = 0n;
-  let totalBorrows = 0n;
-  let totalRepays = 0n;
-
-  for (let i = 0; i < periodBalances.length; i++) {
-    const currentBalance = periodBalances[i];
-    const currentVariableDebt = BigInt(currentBalance.currentVariableDebt);
-    const scaledVariableDebt = BigInt(currentBalance.scaledVariableDebt);
-    const currentIndex = BigInt(currentBalance.index);
-    
-    let dayTotalInterest = 0n;
-    let dayBorrow = 0n;
-    let dayRepay = 0n;
-    
-    if (i === 0) {
-
-      dayTotalInterest = 0n;
-      
-      // Identifier le type de mouvement (premier point)
-      if (currentVariableDebt > currentDebt) {
-        const borrowAmount = currentVariableDebt - currentDebt;
-        dayBorrow += borrowAmount;
-        totalBorrows += borrowAmount;
-      } else if (currentVariableDebt < currentDebt) {
-        const repayAmount = currentDebt - currentVariableDebt;
-        dayRepay += repayAmount;
-        totalRepays += repayAmount;
-      }
-    } else {
-      // Balance suivante
-      const previousBalance: any = periodBalances[i - 1];
-      const previousVariableDebt = BigInt(previousBalance.currentVariableDebt);
-      const previousScaledVariableDebt = BigInt(previousBalance.scaledVariableDebt);
-      const previousIndex = BigInt(previousBalance.index);
-      
-      //  Identifier le type de mouvement avec conversion en sous-jacent
-      if (scaledVariableDebt > previousScaledVariableDebt) {
-        // Borrow : scaled a augmenté
-        const deltaScaled = scaledVariableDebt - previousScaledVariableDebt;
-        //  Convertir en sous-jacent avec l'index courant
-        const borrowAmountWei = (deltaScaled * currentIndex) / RAY;
-        dayBorrow += borrowAmountWei;
-        totalBorrows += borrowAmountWei;
-      } else if (scaledVariableDebt < previousScaledVariableDebt) {
-        // Repay : scaled a diminué
-        const deltaScaled = previousScaledVariableDebt - scaledVariableDebt;
-        // Convertir en sous-jacent avec l'index courant
-        const repayAmountWei = (deltaScaled * currentIndex) / RAY;
-        dayRepay += repayAmountWei;
-        totalRepays += repayAmountWei;
-      }
-      
-      // Calculer les intérêts générés avec la vraie formule RMM
-      // Intérêts = (scaled précédent * (index actuel - index précédent)) / RAY
-      const periodInterest = (previousScaledVariableDebt * (currentIndex - previousIndex)) / RAY;
-      
-      if (periodInterest > 0n) {
-        dayTotalInterest = periodInterest;
-      }
-    }
-    
-    // Créer le détail journalier
-    const dailyDetail = {
-      date: formatDateYYYYMMDD(currentBalance.timestamp),
-      timestamp: currentBalance.timestamp,
-      debt: currentVariableDebt.toString(),
-      periodInterest: dayTotalInterest.toString(),
-      totalInterest: (totalInterest + dayTotalInterest).toString(),
-      transactionAmount: dayBorrow > 0n ? dayBorrow.toString() : (dayRepay > 0n ? dayRepay.toString() : "0"),
-      transactionType: dayBorrow > 0n ? 'borrow' : (dayRepay > 0n ? 'repay' : 'none'),
-      source: "real"
-    };
-    
-    dailyDetails.push(dailyDetail);
-    totalInterest += dayTotalInterest;
-    currentDebt = currentVariableDebt;
-  }
-
-  logger.info(`Calcul terminé: ${dailyDetails.length} jours, total des intérêts: ${Number(totalInterest)} ${token}`);
-
-  return {
-    totalInterest: totalInterest.toString(),
-    dailyDetails,
-    summary: {
-      totalBorrows: totalBorrows.toString(),
-      totalRepays: totalRepays.toString(),
-      currentDebt: currentDebt.toString(),
-      totalInterest: totalInterest.toString()
-    }
-  };
 }
 
 
@@ -348,74 +265,74 @@ async function retrieveInterestAndTransactionsForAllTokens(userAddress: string, 
 
   try {
     logger.info(`Calcul des intérêts V3 pour ${userAddress} via TheGraph`);
-    
+
     // Récupérer les balances pour les calculs d'intérêts
     const allBalances = await fetchAllTokenBalances(userAddress);
-    
+
     // 1 the graph + others via gnosisscan 
     const allTransactions = await fetchAllTransactionsV3(userAddress);
     const gnosisTransactions = await fetchSupplyTokenTransactionsViaGnosisScan(userAddress, allTransactions, 'V3', req);
 
     // 2 transformation unifiée
     const frontendTransactions = transformTransactionsV3ToFrontendFormat(allTransactions, gnosisTransactions);
-    
+
     // Récupérer les balances actuels via RPC
     const currentBalances = await getCurrentBalances(userAddress);
-    
+
     // Calculer les intérêts pour chaque token
     const results: Record<string, any> = {};
     const tokens = ['USDC', 'WXDAI'];
-    
+
     for (const token of tokens) {
       // Calculer les intérêts d'emprunt
       const borrowInterest = calculateDebtInterestFromBalances(allBalances.vtoken, token);
-      
+
       // Calculer les intérêts de dépôt
       const supplyInterest = calculateSupplyInterestFromBalances(allBalances.atoken, token);
-      
+
       //  Ajouter le point "aujourd'hui" et calculer les intérêts
       if (borrowInterest.dailyDetails.length > 0 && currentBalances) {
         const currentDebtBalance = currentBalances[`debt${token}`]?.balance || "0";
-        
+
         // Ajouter le point d'aujourd'hui
         addTodayPoint(borrowInterest.dailyDetails, currentDebtBalance, 'debt', token);
-        
+
       }
-      
+
       if (supplyInterest.dailyDetails.length > 0 && currentBalances) {
         const currentSupplyBalance = currentBalances[`armm${token}`]?.balance || "0";
-        
+
         // Ajouter le point d'aujourd'hui
         addTodayPoint(supplyInterest.dailyDetails, currentSupplyBalance, 'supply', token);
-        
+
       }
-      
+
       // Créer un relevé journalier combiné
       const dailyStatement = createDailyStatement(borrowInterest.dailyDetails, supplyInterest.dailyDetails, token);
-      
-              results[token] = {
-          token,
-          borrow: borrowInterest,
-          supply: supplyInterest,
-          dailyStatement: dailyStatement
-        };
-      }
-      return {
-        USDC: {
-          token: 'USDC',
-          borrow: results.USDC.borrow,
-          supply: results.USDC.supply,
-          dailyStatement: results.USDC.dailyStatement
-        },
-              WXDAI: {
-          token: 'WXDAI',
-          borrow: results.WXDAI.borrow,
-          supply: results.WXDAI.supply,
-          dailyStatement: results.WXDAI.dailyStatement
-        },
+
+      results[token] = {
+        token,
+        borrow: borrowInterest,
+        supply: supplyInterest,
+        dailyStatement: dailyStatement
+      };
+    }
+    return {
+      USDC: {
+        token: 'USDC',
+        borrow: results.USDC.borrow,
+        supply: results.USDC.supply,
+        dailyStatement: results.USDC.dailyStatement
+      },
+      WXDAI: {
+        token: 'WXDAI',
+        borrow: results.WXDAI.borrow,
+        supply: results.WXDAI.supply,
+        dailyStatement: results.WXDAI.dailyStatement
+      },
       transactions: frontendTransactions
     };
-    
+
   } catch (error) {
     logger.error(`Erreur lors du calcul des intérêts TheGraph pour tous les tokens:`, error);
     throw error;
@@ -427,10 +344,10 @@ async function retrieveInterestAndTransactionsForAllTokens(userAddress: string, 
  */
 function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token: string): any[] {
   logger.debug(`Création du relevé journalier pour ${token}`);
-  
+
   // Combiner tous les détails journaliers
   const allDailyDetails: any[] = [];
-  
+
   // Ajouter les détails d'emprunt
   borrowDetails.forEach((detail: any) => {
     allDailyDetails.push({
@@ -446,7 +363,7 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
       source: detail.source
     });
   });
-  
+
   // Ajouter les détails de dépôt
   supplyDetails.forEach((detail: any) => {
     allDailyDetails.push({
@@ -462,13 +379,13 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
       source: detail.source
     });
   });
-  
+
   // Grouper par date et créer le relevé journalier
   const dailyStatement: Record<string, any> = {};
-  
+
   allDailyDetails.forEach((detail: any) => {
     const dateKey = detail.date;
-    
+
     if (!dailyStatement[dateKey]) {
       dailyStatement[dateKey] = {
         date: dateKey,
@@ -482,7 +399,7 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
         source: detail.source
       };
     }
-    
+
     // Mettre à jour les montants
     if (detail.type === 'borrow') {
       dailyStatement[dateKey].debt = detail.debt;
@@ -491,9 +408,9 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
       dailyStatement[dateKey].supply = detail.supply;
       dailyStatement[dateKey].supplyInterest = detail.periodInterest;
     }
-    
+
     dailyStatement[dateKey].totalInterest = dailyStatement[dateKey].borrowInterest + dailyStatement[dateKey].supplyInterest;
-    
+
     // Ajouter la transaction si elle existe
     if (detail.transactionAmount && detail.transactionAmount !== "0") {
       dailyStatement[dateKey].transactions.push({
@@ -502,12 +419,12 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
       });
     }
   });
-  
+
   // Convertir en tableau et trier par date
   const statementArray = Object.values(dailyStatement).sort((a: any, b: any) => a.timestamp - b.timestamp);
-  
+
   logger.debug(`Relevé journalier créé: ${statementArray.length} jours pour ${token}`);
-  
+
   return statementArray;
 }
 
@@ -516,13 +433,13 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
  */
 function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType: string, token: string): any[] {
   if (dailyDetails.length === 0) return dailyDetails as any[];
-  
+
   // Récupérer le dernier point pour avoir le totalInterest
   const lastPoint: any = dailyDetails[dailyDetails.length - 1];
 
   const periodInterest = balanceType === 'debt' ? BigInt(currentBalance) - BigInt(lastPoint.debt || 0) : BigInt(currentBalance) - BigInt(lastPoint.supply || 0);
   const newtotalInterest = BigInt(lastPoint.totalInterest) + BigInt(periodInterest);
-  
+
   // Créer le point d'aujourd'hui
   const today = new Date();
   const todayDate = formatDateYYYYMMDD(Math.floor(today.getTime() / 1000));
@@ -532,16 +449,16 @@ function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType:
     date: todayDate,
     timestamp: todayTimestamp,
     [balanceType]: currentBalance, // 'debt' ou 'supply'
-    periodInterest: periodInterest.toString(), 
-    totalInterest: newtotalInterest.toString(), 
-    transactionAmount: "0", 
+    periodInterest: periodInterest.toString(),
+    totalInterest: newtotalInterest.toString(),
+    transactionAmount: "0",
     transactionType: "BalanceOf",
     source: "real"
   };
-  
+
   // Ajouter le point d'aujourd'hui
   dailyDetails.push(todayPoint);
-  
+
   return dailyDetails;
 }
 
@@ -550,40 +467,40 @@ function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType:
  */
 function calculateLastPointInterest(lastPoint: any, currentBalance: string, balanceType: string, token: string): any {
   if (!lastPoint || !currentBalance) return lastPoint;
-  
+
   const currentBalanceWei = BigInt(currentBalance);
   const lastPointBalance = BigInt(lastPoint[balanceType]); // 'supply' ou 'debt'
-  
+
   // Calculer les intérêts générés depuis le dernier point
   let periodInterest = 0n;
-  
+
   if (balanceType === 'supply') {
     // Pour les supply tokens, calculer la différence
-    const totalIncrease = currentBalanceWei > lastPointBalance ? 
+    const totalIncrease = currentBalanceWei > lastPointBalance ?
       currentBalanceWei - lastPointBalance : 0n;
-    
+
     // Les mouvements de capital sont déjà dans transactionAmount
     const capitalMovements = BigInt(lastPoint.transactionAmount || '0');
-    
+
     periodInterest = totalIncrease - capitalMovements;
   } else if (balanceType === 'debt') {
     // Pour les debt tokens, même logique
-    const totalIncrease = currentBalanceWei > lastPointBalance ? 
+    const totalIncrease = currentBalanceWei > lastPointBalance ?
       currentBalanceWei - lastPointBalance : 0n;
-    
+
     const capitalMovements = BigInt(lastPoint.transactionAmount || '0');
-    
+
     periodInterest = totalIncrease - capitalMovements;
   }
-  
+
   // Mettre à jour le dernier point
   const updatedLastPoint = {
     ...lastPoint,
     periodInterest: periodInterest.toString(),
     totalInterest: (BigInt(lastPoint.totalInterest) + periodInterest).toString(),
-    transactionAmount: "0", 
+    transactionAmount: "0",
     transactionType: "BalanceOf",
-    source: "real" 
+    source: "real"
   };
 
   return updatedLastPoint;
@@ -593,19 +510,19 @@ function calculateLastPointInterest(lastPoint: any, currentBalance: string, bala
  * Crée un résultat vide pour les cas sans données
  */
 function createEmptyResult(type: string): any {
-  const emptySummary = type === 'supply' 
+  const emptySummary = type === 'supply'
     ? {
-        totalSupplies: "0",
-        totalWithdraws: "0",
-        currentSupply: "0",
-        totalInterest: "0"
-      }
+      totalSupplies: "0",
+      totalWithdraws: "0",
+      currentSupply: "0",
+      totalInterest: "0"
+    }
     : {
-        totalBorrows: "0",
-        totalRepays: "0",
-        currentDebt: "0",
-        totalInterest: "0"
-      };
+      totalBorrows: "0",
+      totalRepays: "0",
+      currentDebt: "0",
+      totalInterest: "0"
+    };
 
   return {
     totalInterest: "0",
@@ -622,7 +539,7 @@ function formatDateYYYYMMDD(timestamp: number): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  
+
   return `${year}${month}${day}`;
 }
 
