@@ -285,28 +285,99 @@ export default function Home() {
     return normalizedDate >= normalizedStart && normalizedDate <= normalizedEnd;
   };
 
-  // Fonction prepareChartData avec filtrage par date
+  // Fonction pour créer un point de départ synthétique pour les graphiques filtrés
+  const createSyntheticStartPoint = (
+    filteredDetails: DailyDetail[],
+    allDetails: DailyDetail[],
+    valueKey: 'debt' | 'supply',
+    decimals: number,
+    startDate: string
+  ): { date: string; value: number; formattedDate: string; isSynthetic?: boolean } | null => {
+    if (filteredDetails.length === 0) return null;
+
+    const normalizedStartDate = normalizeDate(startDate);
+
+    // Vérifier si un point existe déjà à la date de début
+    const existingPointAtStart = filteredDetails.find(
+      detail => normalizeDate(detail.date) === normalizedStartDate
+    );
+    if (existingPointAtStart) return null;
+
+    // Trouver le dernier point (balance actuelle)
+    const lastPoint = filteredDetails[filteredDetails.length - 1];
+    if (!lastPoint) return null;
+
+    const currentBalance = formatAmount(lastPoint[valueKey] || '0', decimals);
+
+    // Calculer la somme des intérêts de la période filtrée
+    const totalPeriodInterest = filteredDetails.reduce((sum, detail) => {
+      return sum + formatAmount(detail.periodInterest || '0', decimals);
+    }, 0);
+
+    // La valeur au début = balance actuelle - intérêts accumulés pendant la période
+    const startValue = currentBalance - totalPeriodInterest;
+
+    // Formater la date de début pour l'affichage
+    const startDateFormatted = normalizedStartDate.replace(/-/g, '');
+
+    return {
+      date: startDateFormatted.length === 10
+        ? `${startDateFormatted.substring(0, 4)}${startDateFormatted.substring(5, 7)}${startDateFormatted.substring(8, 10)}`
+        : startDateFormatted,
+      value: Math.max(0, startValue), // Éviter les valeurs négatives
+      formattedDate: new Date(normalizedStartDate).toLocaleDateString('fr-CH'),
+      isSynthetic: true
+    };
+  };
+
+  // Fonction prepareChartData avec filtrage par date et point de départ synthétique
   const prepareChartData = (
-    dailyDetails: DailyDetail[], 
-    valueKey: 'debt' | 'supply', 
+    dailyDetails: DailyDetail[],
+    valueKey: 'debt' | 'supply',
     decimals = 6,
     dateRange?: { start: string; end: string }
   ) => {
     if (!dailyDetails || dailyDetails.length === 0) return [];
-    
+
     // Filtrer par date si dateRange est fourni
     let filteredDetails = dailyDetails;
     if (dateRange) {
-      filteredDetails = dailyDetails.filter(detail => 
+      filteredDetails = dailyDetails.filter(detail =>
         isDateInRange(detail.date, dateRange.start, dateRange.end)
       );
     }
-    
-    return filteredDetails.map(detail => ({
+
+    // Convertir les détails filtrés en données de graphique
+    const chartData = filteredDetails.map(detail => ({
       date: detail.date,
       value: formatAmount(detail[valueKey] || '0', decimals),
-      formattedDate: formatDate(detail.date)
+      formattedDate: formatDate(detail.date),
+      isSynthetic: false
     }));
+
+    // Créer un point de départ synthétique si on filtre par période (pas "all")
+    // et qu'il n'y a pas déjà un point à la date de début
+    if (dateRange && filteredDetails.length > 0) {
+      const oldestDataDate = calculateDefaultDateRange().start;
+      const isAllData = normalizeDate(dateRange.start) <= normalizeDate(oldestDataDate);
+
+      if (!isAllData) {
+        const syntheticPoint = createSyntheticStartPoint(
+          filteredDetails,
+          dailyDetails,
+          valueKey,
+          decimals,
+          dateRange.start
+        );
+
+        if (syntheticPoint) {
+          // Insérer le point synthétique au début
+          chartData.unshift(syntheticPoint);
+        }
+      }
+    }
+
+    return chartData;
   };
 
   // Fonction pour préparer les données V2 pour Recharts avec filtrage par date
@@ -609,6 +680,7 @@ export default function Home() {
             }}
             address={address}
             onResetAddress={resetForm}
+            oldestDataDate={calculateDefaultDateRange().start}
           />
 
           {/* Contenu principal avec padding-top pour éviter le chevauchement */}

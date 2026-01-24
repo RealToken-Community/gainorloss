@@ -1,6 +1,8 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
+type TimePeriod = 'all' | '1y' | '1q' | '1m' | '1w' | '1d';
+
 interface FiltersBarProps {
   selectedTokens: string[];
   onTokensChange: (tokens: string[]) => void;
@@ -9,6 +11,7 @@ interface FiltersBarProps {
   onReset: () => void;
   address: string;
   onResetAddress: () => void;
+  oldestDataDate?: string; // Date la plus ancienne des données (pour "All")
 }
 
 export default function FiltersBar({
@@ -19,10 +22,62 @@ export default function FiltersBar({
   onReset,
   address,
   onResetAddress,
+  oldestDataDate,
 }: FiltersBarProps) {
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [isAddressExpanded, setIsAddressExpanded] = React.useState(false);
+  const [activePeriod, setActivePeriod] = React.useState<TimePeriod>('all');
+
+  // Calcul de la date de début pour chaque période
+  const getDateForPeriod = (period: TimePeriod): string => {
+    const today = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case '1d':
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - 1);
+        break;
+      case '1w':
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - 7);
+        break;
+      case '1m':
+        startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 1);
+        break;
+      case '1q':
+        startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 3);
+        break;
+      case '1y':
+        startDate = new Date(today);
+        startDate.setFullYear(today.getFullYear() - 1);
+        break;
+      case 'all':
+      default:
+        return oldestDataDate || new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+    }
+
+    return startDate.toISOString().split('T')[0];
+  };
+
+  const handlePeriodChange = (period: TimePeriod) => {
+    setActivePeriod(period);
+    const startDate = getDateForPeriod(period);
+    const endDate = new Date().toISOString().split('T')[0];
+    onDateRangeChange({ start: startDate, end: endDate });
+  };
+
+  const timePeriods: { key: TimePeriod; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: '1y', label: '1Y' },
+    { key: '1q', label: '1Q' },
+    { key: '1m', label: '1M' },
+    { key: '1w', label: '1W' },
+    { key: '1d', label: '1D' },
+  ];
 
   // Fonction pour tronquer l'adresse (4 premiers + 4 derniers caractères)
   const truncateAddress = (addr: string): string => {
@@ -182,7 +237,24 @@ export default function FiltersBar({
                 ))}
               </div>
 
-              {/* Sélection de la plage de dates */}
+              {/* Boutons de période rapide */}
+              <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                {timePeriods.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => handlePeriodChange(key)}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                      activePeriod === key
+                        ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sélection de la plage de dates personnalisée */}
               <div className="flex flex-col sm:flex-row items-center gap-3">
                 <div className="flex items-center gap-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">From:</label>
@@ -190,7 +262,10 @@ export default function FiltersBar({
                     type="date"
                     lang="en"
                     value={dateRange.start}
-                    onChange={(e) => onDateRangeChange({ ...dateRange, start: e.target.value })}
+                    onChange={(e) => {
+                      setActivePeriod('all'); // Désélectionner les présets lors d'une sélection manuelle
+                      onDateRangeChange({ ...dateRange, start: e.target.value });
+                    }}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -200,7 +275,10 @@ export default function FiltersBar({
                     type="date"
                     lang="en"
                     value={dateRange.end}
-                    onChange={(e) => onDateRangeChange({ ...dateRange, end: e.target.value })}
+                    onChange={(e) => {
+                      setActivePeriod('all'); // Désélectionner les présets lors d'une sélection manuelle
+                      onDateRangeChange({ ...dateRange, end: e.target.value });
+                    }}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
