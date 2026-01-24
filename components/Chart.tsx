@@ -20,6 +20,7 @@ interface ChartData {
   type?: string;
   amount?: number;
   timestamp?: number;
+  isSynthetic?: boolean;
 }
 
 interface ChartProps {
@@ -33,22 +34,72 @@ interface ChartProps {
   userAddress?: string;
 }
 
+// Custom dot renderer to show synthetic points with different style
+const CustomDot = (props: any) => {
+  const { cx, cy, payload, fill, stroke } = props;
+
+  if (!cx || !cy) return null;
+
+  if (payload?.isSynthetic) {
+    // Synthetic point: hollow circle with dashed border
+    return (
+      <g>
+        <circle
+          cx={cx}
+          cy={cy}
+          r={5}
+          fill="white"
+          stroke={stroke || fill}
+          strokeWidth={2}
+          strokeDasharray="3 2"
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={2}
+          fill={stroke || fill}
+        />
+      </g>
+    );
+  }
+
+  // Regular point
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={3}
+      fill={fill || stroke}
+      stroke={stroke || fill}
+      strokeWidth={2}
+    />
+  );
+};
+
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     const dataPoint = payload[0];
     const value = dataPoint.value;
     const data = dataPoint.payload;
-    
+    const isSynthetic = data?.isSynthetic;
+
     return (
-      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+      <div className={`p-3 rounded-lg shadow-lg border ${isSynthetic
+          ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700'
+          : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+        }`}>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{label}</p>
         <p className="text-lg font-semibold text-gray-900 dark:text-white">
           {value.toFixed(2)}
         </p>
-        {/* Afficher des informations supplémentaires si disponibles */}
-        {data && data.type && (
+        {isSynthetic && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+            <span>~</span> Estimated start value
+          </p>
+        )}
+        {data && data.type && !isSynthetic && (
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Type: {data.type} | Montant: {data.amount?.toFixed(2) || 'N/A'}
+            Type: {data.type} | Amount: {data.amount?.toFixed(2) || 'N/A'}
           </p>
         )}
       </div>
@@ -71,11 +122,11 @@ const Chart: React.FC<ChartProps> = ({
   const isDark = theme === 'dark';
   const gridColor = isDark ? '#374151' : '#f0f0f0';
   const axisColor = isDark ? '#9ca3af' : '#6b7280';
-  
+
   // Vérifier si toutes les valeurs sont à 0 (ou très proches de 0)
   // Cela inclut le cas d'un seul point à 0 ou plusieurs points tous à 0
   const allValuesZero = data && data.length > 0 && data.every(point => Math.abs(point.value) < 0.0001);
-  
+
   // Cas 1: Aucune donnée
   if (!data || data.length === 0) {
     return (
@@ -84,8 +135,8 @@ const Chart: React.FC<ChartProps> = ({
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
             {tokenAddress && userAddress && (
-              <MagnetLink 
-                tokenAddress={tokenAddress} 
+              <MagnetLink
+                tokenAddress={tokenAddress}
                 userAddress={userAddress}
                 className="ml-2"
               />
@@ -113,8 +164,8 @@ const Chart: React.FC<ChartProps> = ({
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
             {tokenAddress && userAddress && (
-              <MagnetLink 
-                tokenAddress={tokenAddress} 
+              <MagnetLink
+                tokenAddress={tokenAddress}
                 userAddress={userAddress}
                 className="ml-2"
               />
@@ -134,14 +185,17 @@ const Chart: React.FC<ChartProps> = ({
     );
   }
 
+  // Check if there's a synthetic point
+  const hasSyntheticPoint = data.some(point => point.isSynthetic);
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
           {tokenAddress && userAddress && (
-            <MagnetLink 
-              tokenAddress={tokenAddress} 
+            <MagnetLink
+              tokenAddress={tokenAddress}
               userAddress={userAddress}
               className="ml-2"
             />
@@ -153,27 +207,27 @@ const Chart: React.FC<ChartProps> = ({
           </div>
         )}
       </div>
-      
+
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           {type === 'area' ? (
             <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={`gradient-${color}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                  <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={color} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis 
-                dataKey="formattedDate" 
+              <XAxis
+                dataKey="formattedDate"
                 stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: axisColor }}
               />
-              <YAxis 
+              <YAxis
                 stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
@@ -192,22 +246,22 @@ const Chart: React.FC<ChartProps> = ({
                 stroke={color}
                 strokeWidth={2}
                 fill={`url(#gradient-${color})`}
-                dot={{ fill: color, strokeWidth: 2, r: 2 }}
+                dot={<CustomDot fill={color} stroke={color} />}
                 activeDot={{ r: 6, stroke: color, strokeWidth: 2 }}
               />
             </AreaChart>
           ) : (
             <LineChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis 
-                dataKey="formattedDate" 
+              <XAxis
+                dataKey="formattedDate"
                 stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: axisColor }}
               />
-              <YAxis 
+              <YAxis
                 stroke={axisColor}
                 fontSize={12}
                 tickLine={false}
@@ -225,7 +279,7 @@ const Chart: React.FC<ChartProps> = ({
                 dataKey="value"
                 stroke={color}
                 strokeWidth={2}
-                dot={{ fill: color, strokeWidth: 2, r: 2 }}
+                dot={<CustomDot fill={color} stroke={color} />}
                 activeDot={{ r: 6, stroke: color, strokeWidth: 2 }}
               />
             </LineChart>
