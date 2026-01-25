@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-type TimePeriod = 'all' | '1y' | '1q' | '1m' | '1w' | '1d';
+type TimePeriod = 'all' | 'ytd' | '1y' | '1q' | '1m' | '1w' | '1d';
+
 
 interface FiltersBarProps {
   selectedTokens: string[];
@@ -55,6 +56,9 @@ export default function FiltersBar({
         startDate = new Date(today);
         startDate.setFullYear(today.getFullYear() - 1);
         break;
+      case 'ytd':
+        // Year To Date: depuis le 1er janvier de l'année en cours
+        return new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
       case 'all':
       default:
         return oldestDataDate || new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
@@ -72,6 +76,7 @@ export default function FiltersBar({
 
   const timePeriods: { key: TimePeriod; label: string }[] = [
     { key: 'all', label: 'All' },
+    { key: 'ytd', label: 'YTD' },
     { key: '1y', label: '1Y' },
     { key: '1q', label: '1Q' },
     { key: '1m', label: '1M' },
