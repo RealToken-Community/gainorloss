@@ -3,6 +3,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 type TimePeriod = 'all' | 'ytd' | '1y' | '1q' | '1m' | '1w' | '1d';
 
+
 interface FiltersBarProps {
   selectedTokens: string[];
   onTokensChange: (tokens: string[]) => void;
