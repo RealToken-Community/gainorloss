@@ -6,6 +6,7 @@ import TransactionsTable from '../components/TransactionsTable';
 import FinancialSummary from '../components/FinancialSummary';
 import FiltersBar from '../components/FiltersBar';
 import logger from '../utils/logger';
+import { calculateStartBalance } from '../lib/utils/interest-calculator';
 
 // Types pour les données de l'API V3
 interface DailyDetail {
@@ -286,6 +287,7 @@ export default function Home() {
   };
 
   // Fonction pour créer un point de départ synthétique pour les graphiques filtrés
+  // Utilise l'interpolation linéaire entre les points existants
   const createSyntheticStartPoint = (
     filteredDetails: DailyDetail[],
     allDetails: DailyDetail[],
@@ -293,7 +295,7 @@ export default function Home() {
     decimals: number,
     startDate: string
   ): { date: string; value: number; formattedDate: string; isSynthetic?: boolean } | null => {
-    if (filteredDetails.length === 0) return null;
+    if (allDetails.length === 0) return null;
 
     const normalizedStartDate = normalizeDate(startDate);
 
@@ -303,19 +305,12 @@ export default function Home() {
     );
     if (existingPointAtStart) return null;
 
-    // Trouver le dernier point (balance actuelle)
-    const lastPoint = filteredDetails[filteredDetails.length - 1];
-    if (!lastPoint) return null;
+    // Utiliser l'interpolation pour calculer la balance à la date de début
+    const result = calculateStartBalance(allDetails, startDate, valueKey);
+    if (!result) return null;
 
-    const currentBalance = formatAmount(lastPoint[valueKey] || '0', decimals);
-
-    // Calculer la somme des intérêts de la période filtrée
-    const totalPeriodInterest = filteredDetails.reduce((sum, detail) => {
-      return sum + formatAmount(detail.periodInterest || '0', decimals);
-    }, 0);
-
-    // La valeur au début = balance actuelle - intérêts accumulés pendant la période
-    const startValue = currentBalance - totalPeriodInterest;
+    // Convertir en unités formatées
+    const startValue = result.balance / Math.pow(10, decimals);
 
     // Formater la date de début pour l'affichage
     const startDateFormatted = normalizedStartDate.replace(/-/g, '');
@@ -324,9 +319,9 @@ export default function Home() {
       date: startDateFormatted.length === 10
         ? `${startDateFormatted.substring(0, 4)}${startDateFormatted.substring(5, 7)}${startDateFormatted.substring(8, 10)}`
         : startDateFormatted,
-      value: Math.max(0, startValue), // Éviter les valeurs négatives
+      value: Math.max(0, startValue),
       formattedDate: new Date(normalizedStartDate).toLocaleDateString('fr-CH'),
-      isSynthetic: true
+      isSynthetic: result.isInterpolated
     };
   };
 
