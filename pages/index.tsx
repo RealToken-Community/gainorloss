@@ -6,7 +6,7 @@ import TransactionsTable from '../components/TransactionsTable';
 import FinancialSummary from '../components/FinancialSummary';
 import FiltersBar from '../components/FiltersBar';
 import logger from '../utils/logger';
-import { calculateStartBalance } from '../lib/utils/interest-calculator';
+import { calculateStartBalance, getPointAtDate, dateToTimestamp } from '../lib/utils/interest-calculator';
 
 // Types pour les données de l'API V3
 interface DailyDetail {
@@ -127,6 +127,7 @@ export default function Home() {
   
   // Filtres partagés entre FinancialSummary et TransactionsTable
   const [selectedTokens, setSelectedTokens] = useState<string[]>(['USDC', 'WXDAI', 'WXDAI_V2']);
+  const [compressDate, setCompressDate] = useState(true);
   
   // Fonction pour calculer la date range par défaut depuis les données
   const calculateDefaultDateRange = (): { start: string; end: string } => {
@@ -260,6 +261,11 @@ export default function Home() {
     return parseFloat(amount) / Math.pow(10, decimals);
   };
 
+  // Fonction pour vérifier si un graphique a des données significatives (balance > 0)
+  const hasSignificantData = (chartData: Array<{ value: number }>): boolean => {
+    return chartData.some(point => point.value > 0.01);
+  };
+
   // Fonction pour formater les dates YYYYMMDD
   const formatDate = (dateStr: string): string => {
     const year = dateStr.substring(0, 4);
@@ -325,7 +331,7 @@ export default function Home() {
     };
   };
 
-  // Fonction prepareChartData avec filtrage par date et point de départ synthétique
+  // Fonction prepareChartData avec filtrage par date, point synthétique et intérêts cumulés
   const prepareChartData = (
     dailyDetails: DailyDetail[],
     valueKey: 'debt' | 'supply',
@@ -342,13 +348,33 @@ export default function Home() {
       );
     }
 
-    // Convertir les détails filtrés en données de graphique
-    const chartData = filteredDetails.map(detail => ({
-      date: detail.date,
-      value: formatAmount(detail[valueKey] || '0', decimals),
-      formattedDate: formatDate(detail.date),
-      isSynthetic: false
-    }));
+    // Obtenir le totalInterest de référence au début de la période
+    // pour calculer les intérêts cumulés relatifs à la période
+    let baseTotalInterest = 0;
+    if (dateRange && dailyDetails.length > 0) {
+      const startPoint = getPointAtDate(dailyDetails, dateRange.start, valueKey);
+      if (startPoint) {
+        baseTotalInterest = startPoint.totalInterest;
+      }
+    } else if (filteredDetails.length > 0) {
+      // Si pas de dateRange, prendre le premier point comme base
+      baseTotalInterest = parseFloat(filteredDetails[0].totalInterest || '0');
+    }
+
+    // Convertir les détails filtrés en données de graphique avec intérêts cumulés
+    const chartData = filteredDetails.map(detail => {
+      const totalInterest = parseFloat(detail.totalInterest || '0');
+      const cumulativeInterest = (totalInterest - baseTotalInterest) / Math.pow(10, decimals);
+
+      return {
+        date: detail.date,
+        value: formatAmount(detail[valueKey] || '0', decimals),
+        cumulativeInterest: Math.max(0, cumulativeInterest),
+        formattedDate: formatDate(detail.date),
+        timestamp: detail.timestamp || dateToTimestamp(detail.date),
+        isSynthetic: false
+      };
+    });
 
     // Créer un point de départ synthétique si on filtre par période (pas "all")
     // et qu'il n'y a pas déjà un point à la date de début
@@ -366,8 +392,12 @@ export default function Home() {
         );
 
         if (syntheticPoint) {
-          // Insérer le point synthétique au début
-          chartData.unshift(syntheticPoint);
+          // Insérer le point synthétique au début avec intérêts cumulés = 0
+          chartData.unshift({
+            ...syntheticPoint,
+            timestamp: dateToTimestamp(dateRange.start),
+            cumulativeInterest: 0
+          });
         }
       }
     }
@@ -676,6 +706,8 @@ export default function Home() {
             address={address}
             onResetAddress={resetForm}
             oldestDataDate={calculateDefaultDateRange().start}
+            compressDate={compressDate}
+            onCompressDateChange={setCompressDate}
           />
 
           {/* Contenu principal avec padding-top pour éviter le chevauchement */}
@@ -729,28 +761,74 @@ export default function Home() {
               </div>
             )}
 
-            {/* Graphiques USDC */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* Graphique Dette USDC */}
-              <Chart
-                data={prepareChartData(usdcBorrowDetails, 'debt', 6, dateRange)}
-                title="USDC Debt Evolution"
-                color="#dc2626"
-                type="line"
-                tokenAddress={TOKENS.USDC.debtAddress}
-                userAddress={address}
-              />
+            {/* Graphiques USDC - Affichage conditionnel */}
+            {(() => {
+              const debtData = prepareChartData(usdcBorrowDetails, 'debt', 6, dateRange);
+              const supplyData = prepareChartData(usdcSupplyDetails, 'supply', 6, dateRange);
+              const hasDebt = hasSignificantData(debtData);
+              const hasSupply = hasSignificantData(supplyData);
 
-              {/* Graphique Supply USDC */}
-              <Chart
-                data={prepareChartData(usdcSupplyDetails, 'supply', 6, dateRange)}
-                title="USDC Supply Evolution"
-                color="#059669"
-                type="area"
-                tokenAddress={TOKENS.USDC.address}
-                userAddress={address}
-              />
-            </div>
+              // Aucune donnée → ne rien afficher
+              if (!hasDebt && !hasSupply) return null;
+
+              // Les deux → 2 colonnes
+              if (hasDebt && hasSupply) {
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <Chart
+                      data={debtData}
+                      title="USDC Debt Evolution"
+                      color="#dc2626"
+                      interestColor="#dc2626"
+                      type="line"
+                      tokenAddress={TOKENS.USDC.debtAddress}
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                    <Chart
+                      data={supplyData}
+                      title="USDC Supply Evolution"
+                      color="#059669"
+                      interestColor="#10b981"
+                      type="area"
+                      tokenAddress={TOKENS.USDC.address}
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                  </div>
+                );
+              }
+
+              // Un seul → centré sur toute la largeur
+              return (
+                <div className="max-w-3xl mx-auto mb-8">
+                  {hasDebt && (
+                    <Chart
+                      data={debtData}
+                      title="USDC Debt Evolution"
+                      color="#dc2626"
+                      interestColor="#dc2626"
+                      type="line"
+                      tokenAddress={TOKENS.USDC.debtAddress}
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                  )}
+                  {hasSupply && (
+                    <Chart
+                      data={supplyData}
+                      title="USDC Supply Evolution"
+                      color="#059669"
+                      interestColor="#10b981"
+                      type="area"
+                      tokenAddress={TOKENS.USDC.address}
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                  )}
+                </div>
+              );
+            })()}
 
             {/* WXDAI Summary */}
             {wxdaiData && (
@@ -779,28 +857,71 @@ export default function Home() {
               </div>
             )}
 
-            {/* Graphiques WXDAI */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              {/* Graphique Dette WXDAI */}
-              <Chart
-                data={prepareChartData(wxdaiBorrowDetails, 'debt', 18, dateRange)}
-                title="WXDAI Debt Evolution"
-                color="#dc2626"
-                type="line"
-                tokenAddress={TOKENS.WXDAI.supplyAddress}
-                userAddress={address}
-              />
-                    
-              {/* Graphique Supply WXDAI */}
-              <Chart
-                data={prepareChartData(wxdaiSupplyDetails, 'supply', 18, dateRange)}
-                title="WXDAI Supply Evolution"
-                color="#059669"
-                type="area"
-                tokenAddress="0x0ca4f5554dd9da6217d62d8df2816c82bba4157b"
-                userAddress={address}
-              />
-            </div>
+            {/* Graphiques WXDAI - Affichage conditionnel */}
+            {(() => {
+              const debtData = prepareChartData(wxdaiBorrowDetails, 'debt', 18, dateRange);
+              const supplyData = prepareChartData(wxdaiSupplyDetails, 'supply', 18, dateRange);
+              const hasDebt = hasSignificantData(debtData);
+              const hasSupply = hasSignificantData(supplyData);
+
+              if (!hasDebt && !hasSupply) return null;
+
+              if (hasDebt && hasSupply) {
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <Chart
+                      data={debtData}
+                      title="WXDAI Debt Evolution"
+                      color="#dc2626"
+                      interestColor="#dc2626"
+                      type="line"
+                      tokenAddress={TOKENS.WXDAI.supplyAddress}
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                    <Chart
+                      data={supplyData}
+                      title="WXDAI Supply Evolution"
+                      color="#059669"
+                      interestColor="#10b981"
+                      type="area"
+                      tokenAddress="0x0ca4f5554dd9da6217d62d8df2816c82bba4157b"
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                  </div>
+                );
+              }
+
+              return (
+                <div className="max-w-3xl mx-auto mb-8">
+                  {hasDebt && (
+                    <Chart
+                      data={debtData}
+                      title="WXDAI Debt Evolution"
+                      color="#dc2626"
+                      interestColor="#dc2626"
+                      type="line"
+                      tokenAddress={TOKENS.WXDAI.supplyAddress}
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                  )}
+                  {hasSupply && (
+                    <Chart
+                      data={supplyData}
+                      title="WXDAI Supply Evolution"
+                      color="#059669"
+                      interestColor="#10b981"
+                      type="area"
+                      tokenAddress="0x0ca4f5554dd9da6217d62d8df2816c82bba4157b"
+                      userAddress={address}
+                      compressDate={compressDate}
+                    />
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Graphiques RMM v2 - Montants */}
             {dataV2 && (
@@ -851,28 +972,67 @@ export default function Home() {
                               </div>
                             </div>
 
-                            {/* Graphiques WXDAI v2 */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                              {/* Graphique Dette WXDAI v2 */}
-                              <Chart
-                                data={prepareChartData(v2WxdaiBorrowDetails, 'debt', 18, dateRange)}
-                                title="WXDAI Debt Evolution (v2)"
-                                color="#f59e0b"
-                                type="line"
-                                tokenAddress={TOKENS.WXDAI.debtV2Address}
-                                userAddress={address}
-                              />
+                            {/* Graphiques WXDAI v2 - Affichage conditionnel */}
+                            {(() => {
+                              const debtData = prepareChartData(v2WxdaiBorrowDetails, 'debt', 18, dateRange);
+                              const supplyData = prepareChartData(v2WxdaiSupplyDetails, 'supply', 18, dateRange);
+                              const hasDebt = hasSignificantData(debtData);
+                              const hasSupply = hasSignificantData(supplyData);
 
-                              {/* Graphique Supply WXDAI v2 */}
-                              <Chart
-                                data={prepareChartData(v2WxdaiSupplyDetails, 'supply', 18, dateRange)}
-                                title="WXDAI Supply Evolution (v2)"
-                                color="#3b82f6"
-                                type="area"
-                                tokenAddress={TOKENS.WXDAI.supplyV2Address}
-                                userAddress={address}
-                              />
-                            </div>
+                              if (!hasDebt && !hasSupply) return null;
+
+                              if (hasDebt && hasSupply) {
+                                return (
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                                    <Chart
+                                      data={debtData}
+                                      title="WXDAI Debt Evolution (v2)"
+                                      color="#f59e0b"
+                                      interestColor="#f59e0b"
+                                      type="line"
+                                      tokenAddress={TOKENS.WXDAI.debtV2Address}
+                                      userAddress={address}
+                                    />
+                                    <Chart
+                                      data={supplyData}
+                                      title="WXDAI Supply Evolution (v2)"
+                                      color="#3b82f6"
+                                      interestColor="#3b82f6"
+                                      type="area"
+                                      tokenAddress={TOKENS.WXDAI.supplyV2Address}
+                                      userAddress={address}
+                                    />
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="max-w-3xl mx-auto mb-8">
+                                  {hasDebt && (
+                                    <Chart
+                                      data={debtData}
+                                      title="WXDAI Debt Evolution (v2)"
+                                      color="#f59e0b"
+                                      interestColor="#f59e0b"
+                                      type="line"
+                                      tokenAddress={TOKENS.WXDAI.debtV2Address}
+                                      userAddress={address}
+                                    />
+                                  )}
+                                  {hasSupply && (
+                                    <Chart
+                                      data={supplyData}
+                                      title="WXDAI Supply Evolution (v2)"
+                                      color="#3b82f6"
+                                      interestColor="#3b82f6"
+                                      type="area"
+                                      tokenAddress={TOKENS.WXDAI.supplyV2Address}
+                                      userAddress={address}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </>
                         );
                       })()}
