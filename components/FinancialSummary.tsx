@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TOKENS } from '../utils/constants';
+import { calculatePeriodInterest } from '../lib/utils/interest-calculator';
 
 interface FinancialSummaryProps {
   // Données V3
@@ -45,25 +46,6 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
 }) => {
   // Utiliser directement dateRange (pas besoin de créer une référence)
 
-  const calculateInterestForCustomPeriod = (
-    dailyDetails: any[], 
-    startTimestamp: number, 
-    endTimestamp: number
-  ) => {
-    if (dailyDetails.length < 2) return 0;
-    
-    let totalInterest = 0;
-    
-    // Parcourir tous les points et sommer les periodInterest dans la plage
-    for (const point of dailyDetails) {
-      if (point.timestamp >= startTimestamp && point.timestamp <= endTimestamp) {
-        totalInterest += parseFloat(point.periodInterest || '0');
-      }
-    }
-    
-    return totalInterest;
-  };
-
 
   const financialData = useMemo(() => {
     const data: Record<string, {
@@ -73,87 +55,79 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
       version: string;
       contract: string;
     }> = {};
-    
-    // Calculer les timestamps pour la période sélectionnée (normaliser les dates)
-    // Start : début de la journée (00:00:00)
-    const startDate = new Date(dateRange.start);
-    startDate.setHours(0, 0, 0, 0);
-    const startTimestamp = Math.floor(startDate.getTime() / 1000);
-    
-    // End : fin de la journée (23:59:59)
-    const endDate = new Date(dateRange.end);
-    endDate.setHours(23, 59, 59, 999);
-    const endTimestamp = Math.floor(endDate.getTime() / 1000);
-      
-      // USDC V3 interpolation
-      if (usdcData && selectedTokens.includes('USDC')) {
-        const debtInterest = calculateInterestForCustomPeriod(
-          usdcData.borrow?.dailyDetails || [], 
-          startTimestamp, 
-          endTimestamp
-        ) / Math.pow(10, 6);
-        
-        const supplyInterest = calculateInterestForCustomPeriod(
-          usdcData.supply?.dailyDetails || [], 
-          startTimestamp, 
-          endTimestamp
-        ) / Math.pow(10, 6);
-        
-        data.USDC = {
-          debt: debtInterest,
-          supply: supplyInterest,
-          net: supplyInterest - debtInterest,
-          version: 'V3',
-          contract: TOKENS.USDC.debtAddress
-        };
-      }
-      
-      // WXDAI V3 interpolation
-      if (wxdaiData && selectedTokens.includes('WXDAI')) {
-        const debtInterest = calculateInterestForCustomPeriod(
-          wxdaiData.borrow?.dailyDetails || [], 
-          startTimestamp, 
-          endTimestamp
-        ) / Math.pow(10, 18);
-        
-        const supplyInterest = calculateInterestForCustomPeriod(
-          wxdaiData.supply?.dailyDetails || [], 
-          startTimestamp, 
-          endTimestamp
-        ) / Math.pow(10, 18);
-        
-        data.WXDAI = {
-          debt: debtInterest,
-          supply: supplyInterest,
-          net: supplyInterest - debtInterest,
-          version: 'V3',
-          contract: TOKENS.WXDAI.debtAddress
-        };
-      }
-      
-      // WXDAI V2 interpolation
-      if (v2Data && selectedTokens.includes('WXDAI_V2')) {
-        const debtInterest = calculateInterestForCustomPeriod(
-          v2Data.borrow?.dailyDetails || [], 
-          startTimestamp, 
-          endTimestamp
-        ) / Math.pow(10, 18);
-        
-        const supplyInterest = calculateInterestForCustomPeriod(
-          v2Data.supply?.dailyDetails || [], 
-          startTimestamp, 
-          endTimestamp
-        ) / Math.pow(10, 18);
-        
-        data.WXDAI_V2 = {
-          debt: debtInterest,
-          supply: supplyInterest,
-          net: supplyInterest - debtInterest,
-          version: 'V2',
-          contract: TOKENS.WXDAI.debtV2Address
-        };
-      }
-    
+
+    // USDC V3
+    if (usdcData && selectedTokens.includes('USDC')) {
+      const debtResult = calculatePeriodInterest(
+        usdcData.borrow?.dailyDetails || [],
+        dateRange.start,
+        dateRange.end,
+        'debt'
+      );
+      const supplyResult = calculatePeriodInterest(
+        usdcData.supply?.dailyDetails || [],
+        dateRange.start,
+        dateRange.end,
+        'supply'
+      );
+
+      data.USDC = {
+        debt: debtResult.interest / Math.pow(10, 6),
+        supply: supplyResult.interest / Math.pow(10, 6),
+        net: (supplyResult.interest - debtResult.interest) / Math.pow(10, 6),
+        version: 'V3',
+        contract: TOKENS.USDC.debtAddress
+      };
+    }
+
+    // WXDAI V3
+    if (wxdaiData && selectedTokens.includes('WXDAI')) {
+      const debtResult = calculatePeriodInterest(
+        wxdaiData.borrow?.dailyDetails || [],
+        dateRange.start,
+        dateRange.end,
+        'debt'
+      );
+      const supplyResult = calculatePeriodInterest(
+        wxdaiData.supply?.dailyDetails || [],
+        dateRange.start,
+        dateRange.end,
+        'supply'
+      );
+
+      data.WXDAI = {
+        debt: debtResult.interest / Math.pow(10, 18),
+        supply: supplyResult.interest / Math.pow(10, 18),
+        net: (supplyResult.interest - debtResult.interest) / Math.pow(10, 18),
+        version: 'V3',
+        contract: TOKENS.WXDAI.debtAddress
+      };
+    }
+
+    // WXDAI V2
+    if (v2Data && selectedTokens.includes('WXDAI_V2')) {
+      const debtResult = calculatePeriodInterest(
+        v2Data.borrow?.dailyDetails || [],
+        dateRange.start,
+        dateRange.end,
+        'debt'
+      );
+      const supplyResult = calculatePeriodInterest(
+        v2Data.supply?.dailyDetails || [],
+        dateRange.start,
+        dateRange.end,
+        'supply'
+      );
+
+      data.WXDAI_V2 = {
+        debt: debtResult.interest / Math.pow(10, 18),
+        supply: supplyResult.interest / Math.pow(10, 18),
+        net: (supplyResult.interest - debtResult.interest) / Math.pow(10, 18),
+        version: 'V2',
+        contract: TOKENS.WXDAI.debtV2Address
+      };
+    }
+
     return data;
   }, [usdcData, wxdaiData, v2Data, selectedTokens, dateRange.start, dateRange.end]);
 

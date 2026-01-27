@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import SettingsPanel from './SettingsPanel';
 
 type TimePeriod = 'all' | 'ytd' | '1y' | '1q' | '1m' | '1w' | '1d';
 
@@ -12,7 +13,9 @@ interface FiltersBarProps {
   onReset: () => void;
   address: string;
   onResetAddress: () => void;
-  oldestDataDate?: string; // Date la plus ancienne des données (pour "All")
+  oldestDataDate?: string;
+  compressDate: boolean;
+  onCompressDateChange: (value: boolean) => void;
 }
 
 export default function FiltersBar({
@@ -24,6 +27,8 @@ export default function FiltersBar({
   address,
   onResetAddress,
   oldestDataDate,
+  compressDate,
+  onCompressDateChange,
 }: FiltersBarProps) {
   const { theme, toggleTheme } = useTheme();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
@@ -179,42 +184,15 @@ export default function FiltersBar({
           </div>
         </div>
 
-        {/* Section adresse expandée - Overlay */}
-        {isAddressExpanded && address && (
-          <div className="fixed inset-0 z-[60] bg-black bg-opacity-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full border border-gray-200 dark:border-gray-700">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Current Address</h3>
-                  <button
-                    onClick={() => setIsAddressExpanded(false)}
-                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    aria-label="Close"
-                  >
-                    <svg
-                      className="w-5 h-5 text-gray-600 dark:text-gray-300"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Full Address</p>
-                  <p className="text-sm font-mono text-gray-900 dark:text-gray-100 break-all">{address}</p>
-                </div>
-                <button
-                  onClick={onResetAddress}
-                  className="w-full px-4 py-3 bg-gray-900 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
-                >
-                  Try another address
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Settings Panel */}
+        <SettingsPanel
+          address={address}
+          onResetAddress={onResetAddress}
+          isOpen={isAddressExpanded}
+          onClose={() => setIsAddressExpanded(false)}
+          compressDate={compressDate}
+          onCompressDateChange={onCompressDateChange}
+        />
 
         {/* Contenu des filtres */}
         {!isCollapsed && (

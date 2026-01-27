@@ -430,20 +430,29 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
 
 /**
  * Ajoute un point "aujourd'hui" aux dailyDetails
+ * Si un point existe déjà pour aujourd'hui, il est remplacé par le balanceOf actuel
  */
 function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType: string, token: string): any[] {
   if (dailyDetails.length === 0) return dailyDetails as any[];
 
-  // Récupérer le dernier point pour avoir le totalInterest
-  const lastPoint: any = dailyDetails[dailyDetails.length - 1];
-
-  const periodInterest = balanceType === 'debt' ? BigInt(currentBalance) - BigInt(lastPoint.debt || 0) : BigInt(currentBalance) - BigInt(lastPoint.supply || 0);
-  const newtotalInterest = BigInt(lastPoint.totalInterest) + BigInt(periodInterest);
-
-  // Créer le point d'aujourd'hui
+  // Créer la date d'aujourd'hui
   const today = new Date();
   const todayDate = formatDateYYYYMMDD(Math.floor(today.getTime() / 1000));
   const todayTimestamp = Math.floor(today.getTime() / 1000);
+
+  // Vérifier si le dernier point est pour aujourd'hui
+  const lastPoint: any = dailyDetails[dailyDetails.length - 1];
+  const lastPointIsToday = lastPoint.date === todayDate;
+
+  // Si le dernier point est aujourd'hui, utiliser l'avant-dernier pour calculer les intérêts
+  const referencePoint = lastPointIsToday && dailyDetails.length > 1
+    ? dailyDetails[dailyDetails.length - 2]
+    : lastPoint;
+
+  const periodInterest = balanceType === 'debt'
+    ? BigInt(currentBalance) - BigInt(referencePoint.debt || 0)
+    : BigInt(currentBalance) - BigInt(referencePoint.supply || 0);
+  const newtotalInterest = BigInt(referencePoint.totalInterest) + BigInt(periodInterest);
 
   const todayPoint = {
     date: todayDate,
@@ -456,8 +465,12 @@ function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType:
     source: "real"
   };
 
-  // Ajouter le point d'aujourd'hui
-  dailyDetails.push(todayPoint);
+  // Si le dernier point est aujourd'hui, le remplacer; sinon, ajouter
+  if (lastPointIsToday) {
+    dailyDetails[dailyDetails.length - 1] = todayPoint;
+  } else {
+    dailyDetails.push(todayPoint);
+  }
 
   return dailyDetails;
 }
