@@ -2,9 +2,8 @@ import { GraphQLClient } from 'graphql-request';
 import logger from '../../utils/logger';
 
 // Configuration TheGraph
-// Subgraph ID pour RealToken RMM sur Gnosis (décentralisé sur TheGraph Network)
-const SUBGRAPH_ID = '2xrWGGZ5r8Z7wdNdHxhbRVKcAD2dDgv3F2NcjrZmxifJ';
-const THEGRAPH_URL = `https://gateway.thegraph.com/api/subgraphs/id/${SUBGRAPH_ID}`;
+const THEGRAPH_URL = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
+
 // Utilise NEXT_PUBLIC_THEGRAPH_API_KEY comme fallback pour compatibilité avec le .env partagé
 const API_KEY = process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
 
