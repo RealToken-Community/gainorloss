@@ -226,11 +226,10 @@ export default function FiltersBar({
                   <button
                     key={key}
                     onClick={() => handlePeriodChange(key)}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
-                      activePeriod === key
-                        ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${activePeriod === key
+                      ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                      }`}
                   >
                     {label}
                   </button>
@@ -272,7 +271,7 @@ export default function FiltersBar({
                 onClick={onReset}
                 className="px-4 py-2 bg-gray-500 dark:bg-gray-700 text-white rounded-lg hover:bg-gray-600 dark:hover:bg-gray-600 transition-colors text-sm font-medium"
               >
-                🔄 Reset Filters
+                🔄 Reset
               </button>
             </div>
           </div>
