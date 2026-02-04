@@ -2,20 +2,32 @@ import { GraphQLClient } from 'graphql-request';
 import logger from '../../utils/logger';
 
 // Configuration TheGraph
-const THEGRAPH_URL = 'https://api.thegraph.com/subgraphs/id/QmVH7ota6caVV2ceLY91KYYh6BJs2zeMScTTYgKDpt7VRg';
+// Subgraph ID pour RealToken RMM sur Gnosis (décentralisé sur TheGraph Network)
+const SUBGRAPH_ID = '2xrWGGZ5r8Z7wdNdHxhbRVKcAD2dDgv3F2NcjrZmxifJ';
+const THEGRAPH_URL = `https://gateway.thegraph.com/api/subgraphs/id/${SUBGRAPH_ID}`;
 
-// Utilise NEXT_PUBLIC_THEGRAPH_API_KEY comme fallback pour compatibilité avec le .env partagé
-const API_KEY = process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
+// IMPORTANT: Lire les variables d'environnement dans une fonction pour le runtime Docker
+// (les variables au top-level sont évaluées au build, pas au runtime en mode standalone)
+function getApiKey(): string | undefined {
+  return process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
+}
 
-// Client GraphQL
+// Client GraphQL - recréé si l'API key change
 let client: GraphQLClient | null = null;
+let clientApiKey: string | undefined = undefined;
+
 async function getClient(): Promise<GraphQLClient> {
-  if (!client) {
+  const apiKey = getApiKey();
+
+  // Recréer le client si l'API key a changé ou si le client n'existe pas
+  if (!client || clientApiKey !== apiKey) {
+    logger.debug(`TheGraph client init - API key present: ${!!apiKey}`);
     client = new GraphQLClient(THEGRAPH_URL, {
-      headers: API_KEY ? {
-        'Authorization': `Bearer ${API_KEY}`
+      headers: apiKey ? {
+        'Authorization': `Bearer ${apiKey}`
       } : {}
     });
+    clientApiKey = apiKey;
   }
   return client;
 }

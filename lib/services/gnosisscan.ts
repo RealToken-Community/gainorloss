@@ -3,8 +3,11 @@ import logger from '../../utils/logger';
 
 // Configuration Gnosisscan
 const GNOSISSCAN_API_URL = 'https://api.etherscan.io/v2/api';
-// Utilise NEXT_PUBLIC_GNOSISSCAN_API_KEY comme fallback pour compatibilité avec le .env partagé
-const API_KEY = process.env.GNOSISSCAN_API_KEY || process.env.NEXT_PUBLIC_GNOSISSCAN_API_KEY || '';
+
+// IMPORTANT: Lire les variables d'environnement dans une fonction pour le runtime Docker
+function getApiKey(): string {
+  return process.env.GNOSISSCAN_API_KEY || process.env.NEXT_PUBLIC_GNOSISSCAN_API_KEY || '';
+}
 
 /**
  * Récupère toutes les transactions de token avec pagination et respect des limites d'API
@@ -50,8 +53,9 @@ async function fetchAllTokenTransactions(
         offset: '1000' // Maximum par page
       });
       
-      if (API_KEY) {
-        params.append('apikey', API_KEY);
+      const apiKey = getApiKey();
+      if (apiKey) {
+        params.append('apikey', apiKey);
       }
       
       const url = `${GNOSISSCAN_API_URL}?${params}`;
