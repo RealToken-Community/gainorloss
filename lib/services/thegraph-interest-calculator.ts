@@ -516,8 +516,16 @@ function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType:
   const lastBalance = BigInt(lastPointBeforeToday[balanceType] || 0);
   const lastTotalInterest = BigInt(lastPointBeforeToday.totalInterest || 0);
 
-  const todayPeriodInterest = BigInt(currentBalance) - lastBalance;
-  const todayTotalInterest = lastTotalInterest + todayPeriodInterest;
+  let todayPeriodInterest = BigInt(currentBalance) - lastBalance;
+  let todayTotalInterest = lastTotalInterest + todayPeriodInterest;
+
+  // Garde-fou : si le calcul donne un totalInterest négatif (cas rare : dépôt+retrait le même jour),
+  // on préserve le totalInterest précédent et on met periodInterest à 0
+  if (todayTotalInterest < 0n) {
+    logger.warn(`[${token}] totalInterest négatif détecté (${todayTotalInterest}), correction appliquée`);
+    todayPeriodInterest = 0n;
+    todayTotalInterest = lastTotalInterest;
+  }
 
   const todayPoint = {
     date: todayDate,
@@ -566,11 +574,20 @@ function calculateLastPointInterest(lastPoint: any, currentBalance: string, bala
     periodInterest = totalIncrease - capitalMovements;
   }
 
+  // Calculer le nouveau totalInterest
+  let newTotalInterest = BigInt(lastPoint.totalInterest) + periodInterest;
+
+  // Garde-fou : si le calcul donne un totalInterest négatif, on préserve la valeur précédente
+  if (newTotalInterest < 0n) {
+    periodInterest = 0n;
+    newTotalInterest = BigInt(lastPoint.totalInterest);
+  }
+
   // Mettre à jour le dernier point
   const updatedLastPoint = {
     ...lastPoint,
     periodInterest: periodInterest.toString(),
-    totalInterest: (BigInt(lastPoint.totalInterest) + periodInterest).toString(),
+    totalInterest: newTotalInterest.toString(),
     transactionAmount: "0",
     transactionType: "BalanceOf",
     source: "real"

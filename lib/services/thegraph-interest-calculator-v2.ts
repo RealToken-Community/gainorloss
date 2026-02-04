@@ -580,14 +580,23 @@ function calculateLastPointInterestV2(lastPoint: any, currentBalance: string, ba
     periodInterest = totalIncrease - capitalMovements;
   }
 
+  // Calculer le nouveau totalInterest
+  let newTotalInterest = BigInt(lastPoint.totalInterest) + periodInterest;
+
+  // Garde-fou : si le calcul donne un totalInterest négatif, on préserve la valeur précédente
+  if (newTotalInterest < 0n) {
+    periodInterest = 0n;
+    newTotalInterest = BigInt(lastPoint.totalInterest);
+  }
+
   // Mettre à jour le dernier point
   const updatedLastPoint = {
     ...lastPoint,
     periodInterest: periodInterest.toString(),
-    totalInterest: (BigInt(lastPoint.totalInterest) + periodInterest).toString(),
-    transactionAmount: "0", 
+    totalInterest: newTotalInterest.toString(),
+    transactionAmount: "0",
     transactionType: "BalanceOf",
-    source: "rpc" 
+    source: "rpc"
   };
 
   return updatedLastPoint;
