@@ -5,9 +5,12 @@ import logger from '../../utils/logger';
 
 /**
  * Configuration depuis les variables d'environnement
- * Utilise NEXT_PUBLIC_GNOSIS_RPC_URL comme fallback pour compatibilité avec le .env partagé
+ * IMPORTANT: Lire les variables dans une fonction pour le runtime Docker
+ * (les variables au top-level sont évaluées au build, pas au runtime en mode standalone)
  */
-const GNOSIS_RPC_URL = process.env.GNOSIS_RPC_URL || process.env.NEXT_PUBLIC_GNOSIS_RPC_URL || 'https://rpc.gnosischain.com/';
+function getGnosisRpcUrl(): string {
+  return process.env.GNOSIS_RPC_URL || process.env.NEXT_PUBLIC_GNOSIS_RPC_URL || 'https://rpc.gnosischain.com/';
+}
 const RAY = BigInt(10 ** 27);
 import { TOKENS } from '../../utils/constants';
 
@@ -55,9 +58,10 @@ async function getCurrentBalances(userAddress: string): Promise<any> {
       ]
     }));
 
-    logger.debug(`Multicall RPC: ${calls.length} tokens`);
+    const rpcUrl = getGnosisRpcUrl();
+    logger.debug(`Multicall RPC: ${calls.length} tokens, URL: ${rpcUrl}`);
 
-    const response = await fetch(GNOSIS_RPC_URL, {
+    const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(calls)

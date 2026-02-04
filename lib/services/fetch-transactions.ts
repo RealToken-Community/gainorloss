@@ -5,18 +5,27 @@ import logger from '../../utils/logger';
 // Subgraph ID pour RealToken RMM sur Gnosis (décentralisé sur TheGraph Network)
 const SUBGRAPH_ID = '2xrWGGZ5r8Z7wdNdHxhbRVKcAD2dDgv3F2NcjrZmxifJ';
 const THEGRAPH_URL_V3 = `https://gateway.thegraph.com/api/subgraphs/id/${SUBGRAPH_ID}`;
-// Utilise NEXT_PUBLIC_THEGRAPH_API_KEY comme fallback pour compatibilité avec le .env partagé
-const API_KEY = process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
 
-// Client GraphQL
+// IMPORTANT: Lire les variables d'environnement dans une fonction pour le runtime Docker
+function getApiKey(): string | undefined {
+  return process.env.THEGRAPH_API_KEY || process.env.NEXT_PUBLIC_THEGRAPH_API_KEY;
+}
+
+// Client GraphQL - recréé si l'API key change
 let client: GraphQLClient | null = null;
+let clientApiKey: string | undefined = undefined;
+
 async function getClient(): Promise<GraphQLClient> {
-  if (!client) {
+  const apiKey = getApiKey();
+
+  if (!client || clientApiKey !== apiKey) {
+    logger.debug(`TheGraph V3 client init - API key present: ${!!apiKey}`);
     client = new GraphQLClient(THEGRAPH_URL_V3, {
       headers: {
-        ...(API_KEY ? { 'Authorization': `Bearer ${API_KEY}` } : {}),
+        ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}),
       }
     });
+    clientApiKey = apiKey;
   }
   return client;
 }
