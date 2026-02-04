@@ -433,48 +433,104 @@ function createDailyStatement(borrowDetails: any[], supplyDetails: any[], token:
 }
 
 /**
- * Ajoute un point "aujourd'hui" aux dailyDetails
+ * Ajoute un point "aujourd'hui" aux dailyDetails avec interpolation des jours manquants
  * Si un point existe déjà pour aujourd'hui, il est remplacé par le balanceOf actuel
+ * Les jours manquants entre le dernier snapshot et aujourd'hui sont interpolés linéairement
+ * Le point "aujourd'hui" utilise le timestamp exact de la requête pour une interpolation précise
  */
 function addTodayPoint(dailyDetails: any[], currentBalance: string, balanceType: string, token: string): any[] {
   if (dailyDetails.length === 0) return dailyDetails as any[];
 
-  // Créer la date d'aujourd'hui
-  const today = new Date();
-  const todayDate = formatDateYYYYMMDD(Math.floor(today.getTime() / 1000));
-  const todayTimestamp = Math.floor(today.getTime() / 1000);
+  // Timestamp exact de la requête (pour le point "aujourd'hui")
+  const now = new Date();
+  const nowTimestamp = Math.floor(now.getTime() / 1000);
 
-  // Vérifier si le dernier point est pour aujourd'hui
-  const lastPoint: any = dailyDetails[dailyDetails.length - 1];
-  const lastPointIsToday = lastPoint.date === todayDate;
+  // Date d'aujourd'hui à minuit (pour les comparaisons de dates)
+  const todayMidnight = new Date(now);
+  todayMidnight.setHours(0, 0, 0, 0);
+  const todayDate = formatDateYYYYMMDD(Math.floor(todayMidnight.getTime() / 1000));
 
-  // Si le dernier point est aujourd'hui, utiliser l'avant-dernier pour calculer les intérêts
-  const referencePoint = lastPointIsToday && dailyDetails.length > 1
-    ? dailyDetails[dailyDetails.length - 2]
-    : lastPoint;
+  // Trouver le dernier point qui n'est pas aujourd'hui
+  let referencePointIndex = dailyDetails.length - 1;
+  while (referencePointIndex >= 0 && dailyDetails[referencePointIndex].date === todayDate) {
+    referencePointIndex--;
+  }
 
-  const periodInterest = balanceType === 'debt'
-    ? BigInt(currentBalance) - BigInt(referencePoint.debt || 0)
-    : BigInt(currentBalance) - BigInt(referencePoint.supply || 0);
-  const newtotalInterest = BigInt(referencePoint.totalInterest) + BigInt(periodInterest);
+  if (referencePointIndex < 0) {
+    // Tous les points sont pour aujourd'hui, on met juste à jour le dernier
+    const lastPoint = dailyDetails[dailyDetails.length - 1];
+    lastPoint[balanceType] = currentBalance;
+    return dailyDetails;
+  }
+
+  const referencePoint = dailyDetails[referencePointIndex];
+  const referenceBalance = BigInt(referencePoint[balanceType] || 0);
+  const referenceTotalInterest = BigInt(referencePoint.totalInterest || 0);
+
+  // Calculer le nombre de jours entre le point de référence et aujourd'hui
+  const referenceDate = new Date(
+    parseInt(referencePoint.date.substring(0, 4)),
+    parseInt(referencePoint.date.substring(4, 6)) - 1,
+    parseInt(referencePoint.date.substring(6, 8))
+  );
+  referenceDate.setHours(0, 0, 0, 0);
+
+  const daysDiff = Math.round((todayMidnight.getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Calculer les intérêts totaux à distribuer
+  const totalInterestToDistribute = BigInt(currentBalance) - referenceBalance;
+
+  // Supprimer les points existants après le point de référence (ils seront recréés)
+  dailyDetails.splice(referencePointIndex + 1);
+
+  // Si plus d'un jour de différence, interpoler les jours manquants
+  if (daysDiff > 1 && totalInterestToDistribute > 0n) {
+    const dailyInterest = totalInterestToDistribute / BigInt(daysDiff);
+    let accumulatedInterest = referenceTotalInterest;
+    let interpolatedBalance = referenceBalance;
+
+    // Créer des points pour chaque jour manquant (sauf aujourd'hui)
+    for (let i = 1; i < daysDiff; i++) {
+      const interpolatedDate = new Date(referenceDate);
+      interpolatedDate.setDate(interpolatedDate.getDate() + i);
+      const interpolatedDateStr = formatDateYYYYMMDD(Math.floor(interpolatedDate.getTime() / 1000));
+
+      interpolatedBalance = interpolatedBalance + dailyInterest;
+      accumulatedInterest = accumulatedInterest + dailyInterest;
+
+      dailyDetails.push({
+        date: interpolatedDateStr,
+        timestamp: Math.floor(interpolatedDate.getTime() / 1000),
+        [balanceType]: interpolatedBalance.toString(),
+        periodInterest: dailyInterest.toString(),
+        totalInterest: accumulatedInterest.toString(),
+        transactionAmount: "0",
+        transactionType: "none",
+        source: "interpolated"
+      });
+    }
+  }
+
+  // Calculer les intérêts restants pour aujourd'hui
+  const lastPointBeforeToday = dailyDetails[dailyDetails.length - 1];
+  const lastBalance = BigInt(lastPointBeforeToday[balanceType] || 0);
+  const lastTotalInterest = BigInt(lastPointBeforeToday.totalInterest || 0);
+
+  const todayPeriodInterest = BigInt(currentBalance) - lastBalance;
+  const todayTotalInterest = lastTotalInterest + todayPeriodInterest;
 
   const todayPoint = {
     date: todayDate,
-    timestamp: todayTimestamp,
-    [balanceType]: currentBalance, // 'debt' ou 'supply'
-    periodInterest: periodInterest.toString(),
-    totalInterest: newtotalInterest.toString(),
+    timestamp: nowTimestamp, // Timestamp exact de la requête, pas minuit
+    [balanceType]: currentBalance,
+    periodInterest: todayPeriodInterest.toString(),
+    totalInterest: todayTotalInterest.toString(),
     transactionAmount: "0",
     transactionType: "BalanceOf",
     source: "real"
   };
 
-  // Si le dernier point est aujourd'hui, le remplacer; sinon, ajouter
-  if (lastPointIsToday) {
-    dailyDetails[dailyDetails.length - 1] = todayPoint;
-  } else {
-    dailyDetails.push(todayPoint);
-  }
+  dailyDetails.push(todayPoint);
 
   return dailyDetails;
 }
