@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { TOKENS } from '../utils/constants';
-import { calculatePeriodInterest } from '../lib/utils/interest-calculator';
+import { calculatePeriodInterest, getPointAtDate, timestampToDate } from '../lib/utils/interest-calculator';
 
 interface FinancialSummaryProps {
   // Données V3
@@ -169,6 +169,64 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
     });
   }, [transactions, selectedTokens, dateRange.start, dateRange.end]);
 
+  // Enrichir les transactions avec les intérêts cumulés
+  const enrichedTransactions = useMemo(() => {
+    if (filteredTransactions.length === 0) return [];
+
+    const getDailyDetailsForTx = (tx: any) => {
+      const side = ['borrow', 'repay'].includes(tx.type) ? 'borrow' : 'supply';
+      const balanceKey = side === 'borrow' ? 'debt' : 'supply' as const;
+      const decimals = tx.token === 'USDC' ? 6 : 18;
+
+      let details: any[] = [];
+      if (tx.token === 'USDC') {
+        details = usdcData?.[side]?.dailyDetails || [];
+      } else if (tx.version === 'V2') {
+        details = v2Data?.[side]?.dailyDetails || [];
+      } else {
+        details = wxdaiData?.[side]?.dailyDetails || [];
+      }
+
+      return { details, balanceKey, decimals };
+    };
+
+    // Sort by timestamp
+    const sorted = [...filteredTransactions].sort((a, b) => a.timestamp - b.timestamp);
+
+    // Calculate base interest at period start for each token+side
+    const baseInterests: Record<string, number> = {};
+    const lastCumuls: Record<string, number> = {};
+
+    return sorted.map(tx => {
+      const side = ['borrow', 'repay'].includes(tx.type) ? 'borrow' : 'supply';
+      const key = `${tx.token}_${tx.version}_${side}`;
+      const { details, balanceKey, decimals } = getDailyDetailsForTx(tx);
+
+      // Compute base interest at period start (once per key)
+      if (!(key in baseInterests)) {
+        const startPoint = getPointAtDate(details, dateRange.start, balanceKey);
+        baseInterests[key] = startPoint ? startPoint.totalInterest : 0;
+        lastCumuls[key] = 0;
+      }
+
+      // Get totalInterest at this transaction's date
+      const txDate = timestampToDate(tx.timestamp);
+      const point = getPointAtDate(details, txDate, balanceKey);
+      const totalInterestAtTx = point ? point.totalInterest : 0;
+
+      const cumulativeInterest = (totalInterestAtTx - baseInterests[key]) / Math.pow(10, decimals);
+      const interestSinceLast = cumulativeInterest - lastCumuls[key];
+      lastCumuls[key] = cumulativeInterest;
+
+      return {
+        ...tx,
+        side: side === 'borrow' ? 'debt' : 'supply',
+        cumulativeInterest,
+        interestSinceLast,
+      };
+    });
+  }, [filteredTransactions, usdcData, wxdaiData, v2Data, dateRange.start]);
+
   const exportToCSV = () => {
     const financialHeaders = ['Token', 'Version', 'Debt Interest', 'Supply Interest', 'PnL Net'];
     const financialDataRows = Object.entries(financialData).map(([tokenKey, data]) => [
@@ -180,13 +238,16 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
     ]);
     
 
-    const transactionHeaders = ['Date', 'Type', 'Token', 'Version', 'Montant', 'Hash'];
-    const transactionData = filteredTransactions.map(tx => [
+    const transactionHeaders = ['Date', 'Transaction', 'Type', 'Token', 'Version', 'Montant', 'Cumul. Interest', 'Since Last Tx', 'Hash'];
+    const transactionData = enrichedTransactions.map(tx => [
       new Date(tx.timestamp * 1000).toLocaleDateString('fr-CH'),
       tx.type,
+      tx.side,
       tx.token,
       tx.version,
       (parseFloat(tx.amount) / Math.pow(10, tx.token === 'USDC' ? 6 : 18)).toFixed(2),
+      tx.cumulativeInterest.toFixed(6),
+      tx.interestSinceLast.toFixed(6),
       tx.txHash || 'N/A'
     ]);
     
@@ -203,7 +264,7 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
       ``, 
       
  
-      ...(filteredTransactions.length > 0 ? [
+      ...(enrichedTransactions.length > 0 ? [
         `TRANSACTION DETAILS`,
         transactionHeaders.join(','),
         ...transactionData.map(row => row.join(','))
@@ -246,15 +307,18 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
         totalSupply: totals.supply,
         netTotal: totals.net
       },
-      transactions: filteredTransactions.map(tx => ({
+      transactions: enrichedTransactions.map(tx => ({
         date: new Date(tx.timestamp * 1000).toISOString(),
         dateFormatted: new Date(tx.timestamp * 1000).toLocaleDateString('fr-CH'),
-        type: tx.type,
+        transaction: tx.type,
+        type: tx.side,
         token: tx.token,
         version: tx.version,
         amount: parseFloat(tx.amount) / Math.pow(10, tx.token === 'USDC' ? 6 : 18),
         amountRaw: tx.amount,
         decimals: tx.token === 'USDC' ? 6 : 18,
+        cumulativeInterest: tx.cumulativeInterest,
+        interestSinceLast: tx.interestSinceLast,
         txHash: tx.txHash || null,
       }))
     };
@@ -346,17 +410,20 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
     doc.text('Transaction Details', 105, 30, { align: 'center' });
     
     // Préparer les données des transactions
-    const txTableData = filteredTransactions.map(tx => [
+    const txTableData = enrichedTransactions.map(tx => [
       new Date(tx.timestamp * 1000).toLocaleDateString('fr-CH'),
       tx.type,
+      tx.side,
       tx.token,
       tx.version,
       `${(parseFloat(tx.amount) / Math.pow(10, tx.token === 'USDC' ? 6 : 18)).toFixed(2)}`,
+      tx.cumulativeInterest.toFixed(6),
+      tx.interestSinceLast.toFixed(6),
       tx.txHash || 'N/A'
     ]);
-    
+
     // En-têtes du tableau des transactions
-    const txHeaders = ['Date', 'Type', 'Token', 'RMM', 'Montant', 'Hash'];
+    const txHeaders = ['Date', 'Transaction', 'Type', 'Token', 'RMM', 'Montant', 'Cumul. Int.', 'Since Last', 'Hash'];
     
     autoTable(doc, {
       startY: 40,
@@ -382,12 +449,15 @@ const FinancialSummary: React.FC<FinancialSummaryProps> = ({
 
       margin: { left: 10, right: 10 }, 
       columnStyles: {
-        0: { cellWidth: 25 }, // Date 
-        1: { cellWidth: 20 }, // Type 
-        2: { cellWidth: 12 }, // Token 
-        3: { cellWidth: 10 }, // Version 
-        4: { cellWidth: 20, halign: 'right' }, // Amount 
-        5: { cellWidth: 100, halign: 'center' }  // Hash
+        0: { cellWidth: 18 }, // Date
+        1: { cellWidth: 15 }, // Transaction
+        2: { cellWidth: 12 }, // Type
+        3: { cellWidth: 12 }, // Token
+        4: { cellWidth: 8 },  // RMM
+        5: { cellWidth: 16, halign: 'right' }, // Amount
+        6: { cellWidth: 18, halign: 'right' }, // Cumul. Interest
+        7: { cellWidth: 18, halign: 'right' }, // Since Last
+        8: { cellWidth: 73, halign: 'center' }  // Hash
       }
 
     });
