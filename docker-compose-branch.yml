@@ -5,7 +5,9 @@ services:
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_GNOSISSCAN_API_KEY=${NEXT_PUBLIC_GNOSISSCAN_API_KEY}
+      - NEXT_PUBLIC_THEGRAPH_API_KEY=${NEXT_PUBLIC_THEGRAPH_API_KEY}
       - NEXT_PUBLIC_THEGRAPH_API_URL=${NEXT_PUBLIC_THEGRAPH_API_URL}
+      - NEXT_PUBLIC_GNOSIS_RPC_URL=${NEXT_PUBLIC_GNOSIS_RPC_URL}
     networks:
       - traefik-realt
       - rmmgain
