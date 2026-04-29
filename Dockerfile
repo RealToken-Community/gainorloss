@@ -7,7 +7,6 @@ WORKDIR /app
 
 # Install dependencies using NPM
 COPY package.json package-lock.json* ./
-RUN apk add --no-cache git openssh
 RUN \
   if [ -f package-lock.json ]; then npm ci; \
   else echo "package-lock.json not found." && exit 1; \
