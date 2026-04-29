@@ -1,5 +1,8 @@
 import { GraphQLClient } from 'graphql-request';
 import logger from '../../utils/logger';
+import { withTimeout, TimeoutError } from '../utils/timeout';
+
+const THEGRAPH_TIMEOUT_MS = 15000;
 
 // Configuration TheGraph
 // Subgraph ID pour RealToken RMM sur Gnosis (décentralisé sur TheGraph Network)
@@ -102,7 +105,10 @@ export async function fetchAllATokenBalances(userAddress: string): Promise<Balan
       };
       
       const graphqlClient = await getClient();
-      const data: { atokenBalanceHistoryItems: BalanceItem[] } = await graphqlClient.request(sTokenBalance_QUERY, variables);
+      const data: { atokenBalanceHistoryItems: BalanceItem[] } = await withTimeout(
+        graphqlClient.request(sTokenBalance_QUERY, variables),
+        THEGRAPH_TIMEOUT_MS
+      );
       const balances = data.atokenBalanceHistoryItems || [];
       
       // Filtrer seulement USDC et WXDAI
@@ -124,8 +130,12 @@ export async function fetchAllATokenBalances(userAddress: string): Promise<Balan
     
     return allBalances;
     
-  } catch (error) {  
-    logger.error('Erreur lors de la récupération des atoken balances:', error);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      logger.error('Timeout TheGraph (atoken balances):', error.message);
+    } else {
+      logger.error('Erreur lors de la récupération des atoken balances:', error);
+    }
     throw error;
   }
 }
@@ -148,7 +158,10 @@ export async function fetchAllVTokenBalances(userAddress: string, req: any = nul
       };
       
       const graphqlClient = await getClient();
-      const data: { vtokenBalanceHistoryItems: BalanceItem[] } = await graphqlClient.request(dTokenBalance_QUERY, variables);
+      const data: { vtokenBalanceHistoryItems: BalanceItem[] } = await withTimeout(
+        graphqlClient.request(dTokenBalance_QUERY, variables),
+        THEGRAPH_TIMEOUT_MS
+      );
       const balances = data.vtokenBalanceHistoryItems || [];
       
       // Filtrer seulement USDC et WXDAI
@@ -171,7 +184,11 @@ export async function fetchAllVTokenBalances(userAddress: string, req: any = nul
     return allBalances;
     
   } catch (error) {
-    logger.error('Erreur lors de la récupération des vtoken balances:', error);
+    if (error instanceof TimeoutError) {
+      logger.error('Timeout TheGraph (vtoken balances):', error.message);
+    } else {
+      logger.error('Erreur lors de la récupération des vtoken balances:', error);
+    }
     throw error;
   }
 }

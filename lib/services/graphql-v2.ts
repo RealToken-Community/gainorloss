@@ -1,5 +1,8 @@
 import { GraphQLClient } from 'graphql-request';
 import logger from '../../utils/logger';
+import { withTimeout, TimeoutError } from '../utils/timeout';
+
+const THEGRAPH_TIMEOUT_MS = 15000;
 
 // Configuration TheGraph V2
 // Subgraph ID pour RealToken RMM V2 sur Gnosis (décentralisé sur TheGraph Network)
@@ -100,7 +103,10 @@ export async function fetchAllATokenBalancesV2(userAddress: string, req: any = n
       };
       
       const client = await getClientV2();
-      const data: { atokenBalanceHistoryItems: BalanceItem[] } = await client.request(sTokenBalance_V2_QUERY, variables);
+      const data: { atokenBalanceHistoryItems: BalanceItem[] } = await withTimeout(
+        client.request(sTokenBalance_V2_QUERY, variables),
+        THEGRAPH_TIMEOUT_MS
+      );
       const balances = data.atokenBalanceHistoryItems || [];
       
       allBalances.push(...balances);
@@ -120,8 +126,12 @@ export async function fetchAllATokenBalancesV2(userAddress: string, req: any = n
     
     return wxdaiBalances;
     
-  } catch (error) {   
-    logger.error('Erreur lors de la récupération des balances atoken V2:', error);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      logger.error('Timeout TheGraph V2 (atoken balances):', error.message);
+    } else {
+      logger.error('Erreur lors de la récupération des balances atoken V2:', error);
+    }
     throw error;
   }
 }
@@ -144,7 +154,10 @@ export async function fetchAllVTokenBalancesV2(userAddress: string, req: any = n
       };
       
       const client = await getClientV2();
-      const data: { vtokenBalanceHistoryItems: BalanceItem[] } = await client.request(dTokenBalance_V2_QUERY, variables);
+      const data: { vtokenBalanceHistoryItems: BalanceItem[] } = await withTimeout(
+        client.request(dTokenBalance_V2_QUERY, variables),
+        THEGRAPH_TIMEOUT_MS
+      );
       const balances = data.vtokenBalanceHistoryItems || [];
       
       allBalances.push(...balances);
@@ -164,8 +177,12 @@ export async function fetchAllVTokenBalancesV2(userAddress: string, req: any = n
     
     return wxdaiBalances;
     
-  } catch (error) {  
-    logger.error('Erreur lors de la récupération des balances vtoken V2:', error);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      logger.error('Timeout TheGraph V2 (vtoken balances):', error.message);
+    } else {
+      logger.error('Erreur lors de la récupération des balances vtoken V2:', error);
+    }
     throw error;
   }
 }

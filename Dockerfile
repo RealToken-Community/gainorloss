@@ -7,8 +7,8 @@ WORKDIR /app
 
 # Install dependencies using NPM
 COPY package.json package-lock.json* ./
-RUN \
-  if [ -f package-lock.json ]; then npm ci; \
+RUN --mount=type=cache,target=/root/.npm \
+  if [ -f package-lock.json ]; then npm ci --cache /root/.npm; \
   else echo "package-lock.json not found." && exit 1; \
   fi
 
@@ -37,7 +37,7 @@ ENV NEXT_PUBLIC_GNOSIS_RPC_URL=$NEXT_PUBLIC_GNOSIS_RPC_URL
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN npm run build && npm prune --production && npm cache clean --force
 
 # Ensure public directory exists (create if it doesn't and add a placeholder file)
 RUN mkdir -p ./public && touch ./public/.gitkeep || true
@@ -61,7 +61,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-RUN npm i sharp@0.32.6 --ignore-engines
 USER nextjs
 
 EXPOSE 3000
