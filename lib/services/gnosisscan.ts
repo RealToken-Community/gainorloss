@@ -1,5 +1,8 @@
 import { TOKENS } from '../../utils/constants';
 import logger from '../../utils/logger';
+import { withTimeout, TimeoutError } from '../utils/timeout';
+
+const GNOSISSCAN_TIMEOUT_MS = 15000;
 
 // Configuration Gnosisscan
 const GNOSISSCAN_API_URL = 'https://api.etherscan.io/v2/api';
@@ -60,8 +63,8 @@ async function fetchAllTokenTransactions(
       
       const url = `${GNOSISSCAN_API_URL}?${params}`;
       
-      const response = await fetch(url);
-      
+      const response = await withTimeout(fetch(url), GNOSISSCAN_TIMEOUT_MS);
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
@@ -125,8 +128,12 @@ async function fetchAllTokenTransactions(
     
     return allTransactions;
     
-  } catch (error) { 
-    logger.error(`Erreur lors de la récupération des transactions de token ${tokenAddress}:`, error);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      logger.error(`Timeout Gnosisscan (token ${tokenAddress}):`, error.message);
+    } else {
+      logger.error(`Erreur lors de la récupération des transactions de token ${tokenAddress}:`, error);
+    }
     throw error;
   }
 }
