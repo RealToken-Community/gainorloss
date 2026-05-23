@@ -49,4 +49,9 @@ README.md
 # Misc
 *.log
 .cache
+*.test.ts
+*.test.tsx
+*.spec.ts
+__tests__
+.eslintrc*
 

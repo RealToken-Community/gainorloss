@@ -1,5 +1,8 @@
 import { GraphQLClient } from 'graphql-request';
 import logger from '../../utils/logger';
+import { withTimeout, TimeoutError } from '../utils/timeout';
+
+const THEGRAPH_TIMEOUT_MS = 15000;
 
 // Configuration TheGraph V3
 // Subgraph ID pour RealToken RMM sur Gnosis (décentralisé sur TheGraph Network)
@@ -230,9 +233,11 @@ async function fetchAllTransactionsV3(userAddress: string, debug: boolean = fals
       const graphqlClient = await getClient();
       let data: any;
       try {
-        data = await graphqlClient.request(query, variables);
+        data = await withTimeout(graphqlClient.request(query, variables), THEGRAPH_TIMEOUT_MS);
       } catch (error) {
-        if (debug) {
+        if (error instanceof TimeoutError) {
+          logger.error(`Timeout TheGraph V3 (batch ${batchNumber}):`, error.message);
+        } else if (debug) {
           logger.error(`Erreur GraphQL détaillée:`, error);
           logger.debug(`Requête envoyée:`, query);
           logger.debug(`Variables envoyées:`, JSON.stringify(variables, null, 2));

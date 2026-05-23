@@ -1,5 +1,8 @@
 import { GraphQLClient } from 'graphql-request';
 import logger from '../../utils/logger';
+import { withTimeout, TimeoutError } from '../utils/timeout';
+
+const THEGRAPH_TIMEOUT_MS = 15000;
 
 // Configuration TheGraph V2
 // Subgraph ID pour RealToken RMM V2 sur Gnosis (décentralisé sur TheGraph Network)
@@ -168,7 +171,10 @@ export async function fetchAllTransactionsV2(userAddress: string): Promise<AllTr
       };
       
       const graphqlClient = await getClient();
-      const data = await graphqlClient.request<GraphQLResponse>(TRANSACTIONS_QUERY_V2, variables);
+      const data = await withTimeout(
+        graphqlClient.request<GraphQLResponse>(TRANSACTIONS_QUERY_V2, variables),
+        THEGRAPH_TIMEOUT_MS
+      );
 
       const isValidSymbol = (symbol: string | undefined) => symbol === 'rmmWXDAI';
       
@@ -195,8 +201,12 @@ export async function fetchAllTransactionsV2(userAddress: string): Promise<AllTr
 
     return allTransactions;
     
-  } catch (error) {   
-    logger.error('Erreur lors de la récupération des transactions V2:', error);
+  } catch (error) {
+    if (error instanceof TimeoutError) {
+      logger.error('Timeout TheGraph V2 (transactions):', error.message);
+    } else {
+      logger.error('Erreur lors de la récupération des transactions V2:', error);
+    }
     throw error;
   }
 }

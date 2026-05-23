@@ -46,8 +46,8 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_REGISTRY }}/rmmgain:${{ github.ref_name }}-frontend
           build-args: |
-            NEXT_PUBLIC_FRONTEND_URL=${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
             NEXT_PUBLIC_GNOSISSCAN_API_KEY=${{ secrets.NEXT_PUBLIC_GNOSISSCAN_API_KEY }}
+            NEXT_PUBLIC_THEGRAPH_API_KEY=${{ secrets.NEXT_PUBLIC_THEGRAPH_API_KEY }}
             NEXT_PUBLIC_THEGRAPH_API_URL=${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
             NEXT_PUBLIC_GNOSIS_RPC_URL=${{ secrets.NEXT_PUBLIC_GNOSIS_RPC_URL }}
 
@@ -80,7 +80,6 @@ jobs:
           NEXT_PUBLIC_THEGRAPH_API_KEY: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_KEY }}
           NEXT_PUBLIC_GNOSISSCAN_API_KEY: ${{ secrets.NEXT_PUBLIC_GNOSISSCAN_API_KEY }}
           NEXT_PUBLIC_GNOSIS_RPC_URL: ${{ secrets.NEXT_PUBLIC_GNOSIS_RPC_URL }}
-          NEXT_PUBLIC_FRONTEND_URL: ${{ secrets.NEXT_PUBLIC_FRONTEND_URL }}
           NEXT_PUBLIC_THEGRAPH_API_URL: ${{ secrets.NEXT_PUBLIC_THEGRAPH_API_URL }}
         run: |
           if [[ "$DOCKER_BRANCH" == "main" ]]; then
@@ -104,7 +103,6 @@ jobs:
             NEXT_PUBLIC_THEGRAPH_API_KEY="$NEXT_PUBLIC_THEGRAPH_API_KEY" \
             NEXT_PUBLIC_GNOSISSCAN_API_KEY="$NEXT_PUBLIC_GNOSISSCAN_API_KEY" \
             NEXT_PUBLIC_GNOSIS_RPC_URL="$NEXT_PUBLIC_GNOSIS_RPC_URL" \
-            NEXT_PUBLIC_FRONTEND_URL="$NEXT_PUBLIC_FRONTEND_URL" \
             NEXT_PUBLIC_THEGRAPH_API_URL="$NEXT_PUBLIC_THEGRAPH_API_URL" \
             HOSTNAME="$HOSTNAME" \
             docker compose --project-name \$DOCKER_BRANCH-rmmgain --file docker-compose-branch.yml up -d

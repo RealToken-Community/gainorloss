@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Head from 'next/head';
 import { TOKENS } from '../utils/constants';
 import Chart from '../components/Chart';
@@ -198,60 +198,9 @@ export default function Home() {
     return { start: startOfYear, end: today };
   });
   
-  // Mettre à jour la date range quand les données sont chargées
   useEffect(() => {
     if (data || dataV2) {
-      // Recalculer avec une fonction inline pour éviter les dépendances circulaires
-      const allDates: string[] = [];
-      
-      const usdcData = data?.data?.results?.[0]?.data?.interests?.USDC;
-      const wxdaiData = data?.data?.results?.[0]?.data?.interests?.WXDAI;
-      const v2Data = dataV2?.data?.results?.[0]?.data?.interests?.WXDAI;
-      
-      if (usdcData?.borrow?.dailyDetails) {
-        usdcData.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
-      }
-      if (usdcData?.supply?.dailyDetails) {
-        usdcData.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
-      }
-      if (wxdaiData?.borrow?.dailyDetails) {
-        wxdaiData.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
-      }
-      if (wxdaiData?.supply?.dailyDetails) {
-        wxdaiData.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
-      }
-      if (v2Data?.borrow?.dailyDetails) {
-        v2Data.borrow.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
-      }
-      if (v2Data?.supply?.dailyDetails) {
-        v2Data.supply.dailyDetails.forEach((detail: any) => allDates.push(detail.date));
-      }
-      
-      // Collecter les dates des transactions (sans filtre pour calculer la plage complète)
-      const transactions = prepareAllTransactions();
-      if (transactions) {
-        transactions.forEach((tx: any) => {
-          const date = new Date(tx.timestamp * 1000);
-          const dateString = date.toISOString().split('T')[0];
-          allDates.push(dateString);
-        });
-      }
-      
-      if (allDates.length > 0) {
-        const sortedDates = allDates
-          .map(date => {
-            if (date.length === 8 && !date.includes('-')) {
-              return `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
-            }
-            return date;
-          })
-          .sort();
-        const oldestDate = sortedDates[0];
-        setDateRange({
-          start: oldestDate,
-          end: new Date().toISOString().split('T')[0]
-        });
-      }
+      setDateRange(calculateDefaultDateRange());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, dataV2]);
@@ -548,7 +497,11 @@ export default function Home() {
     return filteredTransactions.sort((a, b) => b.timestamp - a.timestamp);
   };
 
-
+  const allTransactions = useMemo(
+    () => prepareAllTransactions(dateRange),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, dataV2, dateRange]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -718,7 +671,7 @@ export default function Home() {
               wxdaiData={wxdaiData}
               v2Data={dataV2?.data?.results?.[0]?.data?.interests?.WXDAI}
               userAddress={address}
-              transactions={prepareAllTransactions(dateRange)}
+              transactions={allTransactions}
               selectedTokens={selectedTokens}
               dateRange={dateRange}
             />
@@ -1052,9 +1005,9 @@ export default function Home() {
             )}
 
             {/* Tableau des transactions unifié */}
-            {(data || dataV2) && prepareAllTransactions(dateRange).length > 0 && (
+            {(data || dataV2) && allTransactions.length > 0 && (
               <TransactionsTable 
-                transactions={prepareAllTransactions(dateRange)}
+                transactions={allTransactions}
                 userAddress={address}
                 title="Transactions"
                 isCollapsed={isCollapsed}
